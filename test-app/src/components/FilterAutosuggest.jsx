@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Input, List, ListItem, Typography, Spinner } from '@material-tailwind/react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
@@ -19,7 +19,7 @@ import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
  * @param {Function} props.onLoadItems - Load more items handler
  * @param {Object} props.i18nStrings - Internationalization strings
  */
-export default function FilterAutosuggest({
+const FilterAutosuggest = forwardRef(function FilterAutosuggest({
   value = '',
   onChange,
   onOptionSelect,
@@ -33,11 +33,16 @@ export default function FilterAutosuggest({
   emptyText = 'No matches found',
   onLoadItems,
   i18nStrings = {},
-}) {
+}, ref) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  // Expose focus method to parent
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus?.(),
+  }), []);
 
   const { enteredTextLabel = (text) => `Use: "${text}"` } = i18nStrings;
 
@@ -272,4 +277,6 @@ export default function FilterAutosuggest({
       )}
     </div>
   );
-}
+});
+
+export default FilterAutosuggest;

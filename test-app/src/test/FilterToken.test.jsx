@@ -140,4 +140,75 @@ describe('FilterToken', () => {
       expect(screen.getByText('and')).toBeInTheDocument();
     });
   });
+
+  describe('operation change', () => {
+    it('should call onOperationChange when clicking AND menu item', async () => {
+      const user = userEvent.setup();
+      const onOperationChange = vi.fn();
+      
+      render(
+        <FilterToken
+          {...defaultProps}
+          index={1}
+          showOperation
+          operation="or"
+          onOperationChange={onOperationChange}
+        />
+      );
+      
+      // Click the AND menu item
+      const andButton = screen.getByText('AND');
+      await user.click(andButton);
+      
+      expect(onOperationChange).toHaveBeenCalledWith('and');
+    });
+
+    it('should call onOperationChange when clicking OR menu item', async () => {
+      const user = userEvent.setup();
+      const onOperationChange = vi.fn();
+      
+      render(
+        <FilterToken
+          {...defaultProps}
+          index={1}
+          showOperation
+          operation="and"
+          onOperationChange={onOperationChange}
+        />
+      );
+      
+      // Click the OR menu item
+      const orButton = screen.getByText('OR');
+      await user.click(orButton);
+      
+      expect(onOperationChange).toHaveBeenCalledWith('or');
+    });
+  });
+
+  describe('token removal', () => {
+    it('should call onRemove when clicking dismiss button', async () => {
+      const user = userEvent.setup();
+      const onRemove = vi.fn();
+      
+      render(<FilterToken {...defaultProps} onRemove={onRemove} />);
+      
+      // Find the dismiss button (×)
+      const dismissButton = screen.getByLabelText('dismiss');
+      await user.click(dismissButton);
+      
+      expect(onRemove).toHaveBeenCalledWith(0);
+    });
+
+    it('should call onRemove with correct index', async () => {
+      const user = userEvent.setup();
+      const onRemove = vi.fn();
+      
+      render(<FilterToken {...defaultProps} index={2} onRemove={onRemove} />);
+      
+      const dismissButton = screen.getByLabelText('dismiss');
+      await user.click(dismissButton);
+      
+      expect(onRemove).toHaveBeenCalledWith(2);
+    });
+  });
 });

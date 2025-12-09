@@ -6,10 +6,19 @@ export const ThemeProvider = ({ children }) => <>{children}</>;
 export const Input = React.forwardRef(({ 
   value, 
   onChange, 
+  onFocus,
+  onBlur,
+  onKeyDown,
   placeholder, 
   disabled, 
   'aria-label': ariaLabel,
+  'aria-expanded': ariaExpanded,
+  'aria-haspopup': ariaHaspopup,
+  'aria-autocomplete': ariaAutocomplete,
   icon,
+  labelProps,
+  containerProps,
+  className,
   ...props 
 }, ref) => (
   <div className="input-wrapper">
@@ -18,10 +27,16 @@ export const Input = React.forwardRef(({
       type="text"
       value={value}
       onChange={onChange}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
       placeholder={placeholder}
       disabled={disabled}
       aria-label={ariaLabel}
-      {...props}
+      aria-expanded={ariaExpanded}
+      aria-haspopup={ariaHaspopup}
+      aria-autocomplete={ariaAutocomplete}
+      className={className}
     />
     {icon}
   </div>

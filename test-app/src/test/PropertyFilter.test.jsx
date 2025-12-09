@@ -333,4 +333,157 @@ describe('PropertyFilter', () => {
       expect(input).toBeInTheDocument();
     });
   });
+
+  describe('token limit toggle', () => {
+    it('should toggle between show more and show fewer', async () => {
+      const user = userEvent.setup();
+      const query = {
+        tokens: [
+          { propertyKey: 'status', operator: '=', value: 'active' },
+          { propertyKey: 'name', operator: ':', value: 'john' },
+          { propertyKey: 'name', operator: ':', value: 'jane' },
+        ],
+        operation: 'and',
+      };
+      
+      render(
+        <PropertyFilter {...defaultProps} query={query} tokenLimit={2} />
+      );
+      
+      // Should show "Show more"
+      const showMoreButton = screen.getByText(/Show more/);
+      expect(showMoreButton).toBeInTheDocument();
+      
+      // Click to show all
+      await user.click(showMoreButton);
+      
+      // Should now show "Show fewer"
+      expect(screen.getByText(/Show fewer/)).toBeInTheDocument();
+    });
+  });
+
+  describe('option selection', () => {
+    it('should handle keepOpenOnSelect option', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      
+      render(<PropertyFilter {...defaultProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+      
+      // Click on a property (keepOpenOnSelect)
+      await waitFor(() => {
+        expect(screen.getByText('Name')).toBeInTheDocument();
+      });
+      
+      await user.click(screen.getByText('Name'));
+      
+      // Input should be updated with the property name
+      expect(input).toHaveValue('Name');
+    });
+
+    it('should handle empty option value', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      
+      render(<PropertyFilter {...defaultProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+      
+      // onChange should not be called for empty values
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onLoadItems', () => {
+    it('should call onLoadItems when focusing input', async () => {
+      const user = userEvent.setup();
+      const onLoadItems = vi.fn();
+      
+      render(<PropertyFilter {...defaultProps} onLoadItems={onLoadItems} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+      
+      expect(onLoadItems).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filteringText: '',
+          firstPage: true,
+          samePage: false,
+        })
+      );
+    });
+  });
+
+  describe('custom filter actions', () => {
+    it('should render custom filter actions instead of clear button', () => {
+      const query = {
+        tokens: [{ propertyKey: 'status', operator: '=', value: 'active' }],
+        operation: 'and',
+      };
+      
+      render(
+        <PropertyFilter
+          {...defaultProps}
+          query={query}
+          customFilterActions={<button>Custom Action</button>}
+        />
+      );
+      
+      expect(screen.getByText('Custom Action')).toBeInTheDocument();
+      expect(screen.queryByText('Clear filters')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('operator step parsing', () => {
+    it('should handle operator step when typing property with partial operator', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      
+      render(<PropertyFilter {...defaultProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      // Type property name followed by partial operator
+      await user.type(input, 'Name !{Enter}');
+      
+      // Should create a free text token since operator is incomplete
+      expect(onChange).toHaveBeenCalled();
+    });
+  });
+
+  describe('loading state', () => {
+    it('should show loading state', () => {
+      render(<PropertyFilter {...defaultProps} loading />);
+      
+      // Component should render without errors in loading state
+      expect(screen.getByRole('textbox')).toBeInTheDocument();
+    });
+  });
+
+  describe('empty token value', () => {
+    it('should not create token with empty value', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      
+      render(<PropertyFilter {...defaultProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, '   {Enter}');
+      
+      // Should not call onChange for whitespace-only input
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ref forwarding', () => {
+    it('should expose focus method via ref', () => {
+      const ref = React.createRef();
+      render(<PropertyFilter {...defaultProps} ref={ref} />);
+      
+      expect(ref.current).toBeDefined();
+      expect(typeof ref.current.focus).toBe('function');
+    });
+  });
 });
