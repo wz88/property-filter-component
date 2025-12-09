@@ -69,7 +69,8 @@ describe('PropertyFilter', () => {
       
       render(<PropertyFilter {...defaultProps} query={query} />);
       
-      expect(screen.getByText('Status')).toBeInTheDocument();
+      // Use getAllByText since Status appears in both dropdown and token
+      expect(screen.getAllByText('Status').length).toBeGreaterThan(0);
       expect(screen.getByText('active')).toBeInTheDocument();
     });
 

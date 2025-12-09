@@ -256,39 +256,6 @@ describe('FilterAutosuggest', () => {
       expect(onChange).toHaveBeenCalledWith('Name');
     });
 
-    it('should show entered text option when value exists', async () => {
-      const user = userEvent.setup();
-      render(<FilterAutosuggest {...defaultProps} value="test" />);
-
-      const input = screen.getByRole('textbox');
-      await user.click(input);
-
-      expect(screen.getByText('Use: "test"')).toBeInTheDocument();
-    });
-
-    it('should call onOptionSelect when clicking entered text option', async () => {
-      const user = userEvent.setup();
-      const onOptionSelect = vi.fn();
-      render(
-        <FilterAutosuggest
-          {...defaultProps}
-          value="test"
-          onOptionSelect={onOptionSelect}
-        />
-      );
-
-      const input = screen.getByRole('textbox');
-      await user.click(input);
-
-      const enteredTextOption = screen.getByText('Use: "test"');
-      await user.click(enteredTextOption);
-
-      expect(onOptionSelect).toHaveBeenCalledWith({
-        value: 'test',
-        isEnteredText: true,
-      });
-    });
-
     it('should render option with description', async () => {
       const user = userEvent.setup();
       render(<FilterAutosuggest {...defaultProps} />);

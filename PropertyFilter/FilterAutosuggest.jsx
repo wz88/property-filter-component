@@ -76,17 +76,26 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
     setHighlightedIndex(-1);
   };
 
+  // Helper to focus the input element
+  const focusInput = () => {
+    // Material Tailwind Input wraps the actual input, so we need to find it
+    const input = inputRef.current?.querySelector?.('input') || inputRef.current;
+    input?.focus?.();
+  };
+
   // Handle option selection
   const handleOptionClick = (option, e) => {
     if (option.keepOpenOnSelect) {
       e?.preventDefault();
       onChange?.(option.value);
       onOptionSelect?.({ ...option, preventDefault: () => {} });
+      // Keep dropdown open and refocus input after a short delay
+      setTimeout(focusInput, 10);
     } else {
       onOptionSelect?.(option);
       setIsOpen(false);
+      setTimeout(focusInput, 10);
     }
-    inputRef.current?.focus();
   };
 
   // Handle keyboard navigation
@@ -158,14 +167,12 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
   };
 
   const hasOptions = filteredOptions.some(group => group.options?.length > 0);
-  const showEnteredTextOption = value.trim() && !disabled;
 
   return (
     <div className="relative w-full">
       {/* Input field */}
-      <div className="relative">
+      <div className="relative" ref={inputRef}>
         <Input
-          ref={inputRef}
           type="text"
           value={value}
           onChange={handleInputChange}
@@ -184,8 +191,8 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
         />
       </div>
 
-      {/* Dropdown */}
-      {isOpen && !disabled && (
+      {/* Dropdown - hide when typing free text with no options */}
+      {isOpen && !disabled && (hasOptions || !value.trim()) && (
         <div
           ref={dropdownRef}
           className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg 
@@ -199,21 +206,6 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
             </div>
           ) : (
             <>
-              {/* Entered text option */}
-              {showEnteredTextOption && (
-                <ListItem
-                  className="py-2 px-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100"
-                  onClick={(e) => {
-                    onOptionSelect?.({ value: value.trim(), isEnteredText: true });
-                    setIsOpen(false);
-                  }}
-                >
-                  <Typography variant="small" className="text-blue-600 font-medium">
-                    {enteredTextLabel(value.trim())}
-                  </Typography>
-                </ListItem>
-              )}
-
               {/* Grouped options */}
               {filteredOptions.map((group, groupIndex) => (
                 <div key={group.label || groupIndex}>
@@ -263,8 +255,8 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
                 </div>
               ))}
 
-              {/* Empty state */}
-              {!hasOptions && !showEnteredTextOption && (
+              {/* Empty state - only show when no value typed (not for free text filtering) */}
+              {!hasOptions && !value.trim() && (
                 <div className="py-4 px-3 text-center">
                   <Typography variant="small" className="text-gray-500">
                     {emptyText}

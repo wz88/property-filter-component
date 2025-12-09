@@ -1,4 +1,4 @@
-import React, { useState, useRef, useImperativeHandle, forwardRef, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef, useMemo, useCallback, useEffect } from 'react';
 import { Button, Typography } from '@material-tailwind/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
@@ -93,6 +93,13 @@ const PropertyFilter = forwardRef(function PropertyFilter(
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus?.(),
   }), []);
+
+  // Auto-focus on mount
+  useEffect(() => {
+    if (!disabled) {
+      inputRef.current?.focus?.();
+    }
+  }, [disabled]);
 
   // Process filtering properties to internal format
   const internalProperties = useMemo(() => {
