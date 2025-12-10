@@ -11,6 +11,8 @@ import {
   removeOperator,
   tokenGroupToTokens,
   getAllowedOperators,
+  operatorToApi,
+  queryToApiFormat,
 } from './utils';
 
 /**
@@ -47,10 +49,13 @@ export function getQueryActions({ query, onChange, filteringOptions }) {
     };
 
     const tokens = newQuery.tokens.map(transformToken);
-    onChange({
+    const internalQuery = {
       tokens: tokenGroupToTokens(tokens),
       operation: newQuery.operation,
-    });
+    };
+    
+    // Convert to API format before calling onChange
+    onChange(queryToApiFormat(internalQuery));
   };
 
   const addToken = (token) => {

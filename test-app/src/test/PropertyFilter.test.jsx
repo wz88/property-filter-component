@@ -24,7 +24,7 @@ describe('PropertyFilter', () => {
       { propertyKey: 'status', value: 'active', label: 'Active' },
       { propertyKey: 'status', value: 'inactive', label: 'Inactive' },
     ],
-    query: { tokens: [], operation: 'and' },
+    query: { filter: { AND: [], OR: [] } },
     onChange: vi.fn(),
   };
 
@@ -61,10 +61,10 @@ describe('PropertyFilter', () => {
 
     it('should render existing tokens', () => {
       const query = {
-        tokens: [
-          { propertyKey: 'status', operator: '=', value: 'active' },
-        ],
-        operation: 'and',
+        filter: {
+          AND: [{ field: 'status', op: 'equals', value: 'active' }],
+          OR: [],
+        },
       };
       
       render(<PropertyFilter {...defaultProps} query={query} />);
@@ -76,8 +76,10 @@ describe('PropertyFilter', () => {
 
     it('should render count text when tokens exist', () => {
       const query = {
-        tokens: [{ propertyKey: 'status', operator: '=', value: 'active' }],
-        operation: 'and',
+        filter: {
+          AND: [{ field: 'status', op: 'equals', value: 'active' }],
+          OR: [],
+        },
       };
       
       render(
@@ -147,16 +149,12 @@ describe('PropertyFilter', () => {
       const input = screen.getByRole('textbox');
       await user.type(input, 'search term{Enter}');
       
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tokens: expect.arrayContaining([
-            expect.objectContaining({
-              operator: ':',
-              value: 'search term',
-            }),
-          ]),
-        })
-      );
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          AND: [{ field: null, op: 'contains', value: 'search term' }],
+          OR: [],
+        },
+      });
     });
 
     it('should create property token', async () => {
@@ -168,17 +166,12 @@ describe('PropertyFilter', () => {
       const input = screen.getByRole('textbox');
       await user.type(input, 'Status = active{Enter}');
       
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tokens: expect.arrayContaining([
-            expect.objectContaining({
-              propertyKey: 'status',
-              operator: '=',
-              value: 'active',
-            }),
-          ]),
-        })
-      );
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          AND: [{ field: 'status', op: 'equals', value: 'active' }],
+          OR: [],
+        },
+      });
     });
 
     it('should clear input after token creation', async () => {
@@ -197,10 +190,10 @@ describe('PropertyFilter', () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
       const query = {
-        tokens: [
-          { propertyKey: 'status', operator: '=', value: 'active' },
-        ],
-        operation: 'and',
+        filter: {
+          AND: [{ field: 'status', op: 'equals', value: 'active' }],
+          OR: [],
+        },
       };
       
       render(
@@ -210,22 +203,22 @@ describe('PropertyFilter', () => {
       const clearButton = screen.getByText('Clear filters');
       await user.click(clearButton);
       
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tokens: [],
-        })
-      );
+      expect(onChange).toHaveBeenCalledWith({
+        filter: { AND: [], OR: [] },
+      });
     });
   });
 
   describe('operation toggle', () => {
     it('should render operation selector between tokens', () => {
       const query = {
-        tokens: [
-          { propertyKey: 'status', operator: '=', value: 'active' },
-          { propertyKey: 'name', operator: ':', value: 'john' },
-        ],
-        operation: 'and',
+        filter: {
+          AND: [
+            { field: 'status', op: 'equals', value: 'active' },
+            { field: 'name', op: 'contains', value: 'john' },
+          ],
+          OR: [],
+        },
       };
       
       render(<PropertyFilter {...defaultProps} query={query} />);
@@ -235,11 +228,13 @@ describe('PropertyFilter', () => {
 
     it('should hide operations when hideOperations is true', () => {
       const query = {
-        tokens: [
-          { propertyKey: 'status', operator: '=', value: 'active' },
-          { propertyKey: 'name', operator: ':', value: 'john' },
-        ],
-        operation: 'and',
+        filter: {
+          AND: [
+            { field: 'status', op: 'equals', value: 'active' },
+            { field: 'name', op: 'contains', value: 'john' },
+          ],
+          OR: [],
+        },
       };
       
       render(
@@ -253,12 +248,14 @@ describe('PropertyFilter', () => {
   describe('token limit', () => {
     it('should show "Show more" when tokens exceed limit', () => {
       const query = {
-        tokens: [
-          { propertyKey: 'status', operator: '=', value: 'active' },
-          { propertyKey: 'name', operator: ':', value: 'john' },
-          { propertyKey: 'name', operator: ':', value: 'jane' },
-        ],
-        operation: 'and',
+        filter: {
+          AND: [
+            { field: 'status', op: 'equals', value: 'active' },
+            { field: 'name', op: 'contains', value: 'john' },
+            { field: 'name', op: 'contains', value: 'jane' },
+          ],
+          OR: [],
+        },
       };
       
       render(
@@ -306,8 +303,10 @@ describe('PropertyFilter', () => {
   describe('i18n', () => {
     it('should use custom i18n strings', () => {
       const query = {
-        tokens: [{ propertyKey: 'status', operator: '=', value: 'active' }],
-        operation: 'and',
+        filter: {
+          AND: [{ field: 'status', op: 'equals', value: 'active' }],
+          OR: [],
+        },
       };
       
       render(
@@ -339,12 +338,14 @@ describe('PropertyFilter', () => {
     it('should toggle between show more and show fewer', async () => {
       const user = userEvent.setup();
       const query = {
-        tokens: [
-          { propertyKey: 'status', operator: '=', value: 'active' },
-          { propertyKey: 'name', operator: ':', value: 'john' },
-          { propertyKey: 'name', operator: ':', value: 'jane' },
-        ],
-        operation: 'and',
+        filter: {
+          AND: [
+            { field: 'status', op: 'equals', value: 'active' },
+            { field: 'name', op: 'contains', value: 'john' },
+            { field: 'name', op: 'contains', value: 'jane' },
+          ],
+          OR: [],
+        },
       };
       
       render(
@@ -421,8 +422,10 @@ describe('PropertyFilter', () => {
   describe('custom filter actions', () => {
     it('should render custom filter actions instead of clear button', () => {
       const query = {
-        tokens: [{ propertyKey: 'status', operator: '=', value: 'active' }],
-        operation: 'and',
+        filter: {
+          AND: [{ field: 'status', op: 'equals', value: 'active' }],
+          OR: [],
+        },
       };
       
       render(

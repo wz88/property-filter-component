@@ -5,7 +5,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import FilterAutosuggest from './FilterAutosuggest';
 import FilterToken from './FilterToken';
 import { getQueryActions, parseText, getAutosuggestOptions, formatToken } from './controller';
-import { getAllowedOperators, generateId, validateTokenValue } from './utils';
+import { getAllowedOperators, generateId, validateTokenValue, apiToQueryFormat } from './utils';
 
 /**
  * Default i18n strings
@@ -138,16 +138,21 @@ const PropertyFilter = forwardRef(function PropertyFilter(
     defaultOperator: ':',
   }), [disableFreeTextFiltering]);
 
-  // Internal query with property references
-  const internalQuery = useMemo(() => ({
-    operation: query.operation || 'and',
-    tokens: (query.tokens || []).map(token => ({
-      ...token,
-      property: token.propertyKey
-        ? internalProperties.find(p => p.key === token.propertyKey) || null
-        : null,
-    })),
-  }), [query, internalProperties]);
+  // Convert API format query to internal format with property references
+  const internalQuery = useMemo(() => {
+    // Convert from API format {filter: {AND: [], OR: []}} to internal format
+    const converted = apiToQueryFormat(query);
+    
+    return {
+      operation: converted.operation || 'and',
+      tokens: (converted.tokens || []).map(token => ({
+        ...token,
+        property: token.propertyKey
+          ? internalProperties.find(p => p.key === token.propertyKey) || null
+          : null,
+      })),
+    };
+  }, [query, internalProperties]);
 
   // Query actions
   const { addToken, updateToken, updateOperation, removeToken, removeAllTokens } = useMemo(

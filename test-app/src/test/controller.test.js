@@ -92,13 +92,13 @@ describe('controller', () => {
 
       addToken({ property: null, operator: ':', value: 'test' });
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tokens: expect.arrayContaining([
-            expect.objectContaining({ operator: ':', value: 'test' }),
-          ]),
-        })
-      );
+      // Now outputs API format
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          AND: [{ field: null, op: 'contains', value: 'test' }],
+          OR: [],
+        },
+      });
     });
 
     it('should remove a token', () => {
@@ -114,11 +114,12 @@ describe('controller', () => {
 
       removeToken(0);
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tokens: [expect.objectContaining({ value: 'second' })],
-        })
-      );
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          AND: [{ field: null, op: 'contains', value: 'second' }],
+          OR: [],
+        },
+      });
     });
 
     it('should remove all tokens', () => {
@@ -134,11 +135,9 @@ describe('controller', () => {
 
       removeAllTokens();
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tokens: [],
-        })
-      );
+      expect(onChange).toHaveBeenCalledWith({
+        filter: { AND: [], OR: [] },
+      });
     });
 
     it('should update operation', () => {
@@ -148,11 +147,9 @@ describe('controller', () => {
 
       updateOperation('or');
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          operation: 'or',
-        })
-      );
+      expect(onChange).toHaveBeenCalledWith({
+        filter: { AND: [], OR: [] },
+      });
     });
   });
 

@@ -88,56 +88,72 @@ const FILTERING_OPTIONS = [
   { propertyKey: 'department', value: 'Finance', label: 'Finance' },
 ];
 
-// Apply filters to data
+// Map API operator names to filter functions
+const operatorFunctions = {
+  'equals': (itemValue, filterValue) => itemValue === filterValue,
+  'does-not-equal': (itemValue, filterValue) => itemValue !== filterValue,
+  'contains': (itemValue, filterValue) => itemValue.includes(filterValue),
+  'does-not-contain': (itemValue, filterValue) => !itemValue.includes(filterValue),
+  'starts-with': (itemValue, filterValue) => itemValue.startsWith(filterValue),
+  'does-not-start-with': (itemValue, filterValue) => !itemValue.startsWith(filterValue),
+  'greater-than': (itemValue, filterValue) => parseFloat(itemValue) > parseFloat(filterValue),
+  'less-than': (itemValue, filterValue) => parseFloat(itemValue) < parseFloat(filterValue),
+  'greater-than-or-equal': (itemValue, filterValue) => parseFloat(itemValue) >= parseFloat(filterValue),
+  'less-than-or-equal': (itemValue, filterValue) => parseFloat(itemValue) <= parseFloat(filterValue),
+};
+
+// Apply filters to data (using new API format)
 function applyFilters(data, query) {
-  if (!query.tokens || query.tokens.length === 0) {
+  const { filter = {} } = query;
+  const { AND = [], OR = [] } = filter;
+  
+  // Determine which filters to apply
+  const hasAndFilters = AND.length > 0;
+  const hasOrFilters = OR.length > 0;
+  
+  if (!hasAndFilters && !hasOrFilters) {
     return data;
   }
 
   return data.filter(item => {
-    const tokenResults = query.tokens.map(token => {
-      const { propertyKey, operator, value } = token;
+    const evaluateFilter = (filterItem) => {
+      const { field, op, value } = filterItem;
 
-      // Free text search (no property specified)
-      if (!propertyKey) {
+      // Free text search (no field specified)
+      if (!field) {
         const searchValue = String(value).toLowerCase();
         return Object.values(item).some(val =>
           String(val).toLowerCase().includes(searchValue)
         );
       }
 
-      const itemValue = String(item[propertyKey] || '').toLowerCase();
+      const itemValue = String(item[field] || '').toLowerCase();
       const filterValue = String(value).toLowerCase();
 
-      switch (operator) {
-        case '=':
-          return itemValue === filterValue;
-        case '!=':
-          return itemValue !== filterValue;
-        case ':':
-          return itemValue.includes(filterValue);
-        case '!:':
-          return !itemValue.includes(filterValue);
-        case '^':
-          return itemValue.startsWith(filterValue);
-        case '!^':
-          return !itemValue.startsWith(filterValue);
-        default:
-          return true;
-      }
-    });
+      const operatorFn = operatorFunctions[op];
+      return operatorFn ? operatorFn(itemValue, filterValue) : true;
+    };
 
-    // Apply AND/OR logic
-    return query.operation === 'and'
-      ? tokenResults.every(Boolean)
-      : tokenResults.some(Boolean);
+    // Apply AND logic
+    if (hasAndFilters) {
+      return AND.every(evaluateFilter);
+    }
+    
+    // Apply OR logic
+    if (hasOrFilters) {
+      return OR.some(evaluateFilter);
+    }
+
+    return true;
   });
 }
 
 function App() {
   const [query, setQuery] = useState({
-    tokens: [],
-    operation: 'and',
+    filter: {
+      AND: [],
+      OR: [],
+    },
   });
 
   // Apply filters
@@ -145,10 +161,12 @@ function App() {
 
   // Count text
   const countText = useMemo(() => {
-    if (query.tokens.length === 0) return undefined;
+    const { filter = {} } = query;
+    const totalFilters = (filter.AND?.length || 0) + (filter.OR?.length || 0);
+    if (totalFilters === 0) return undefined;
     const count = filteredUsers.length;
     return count === 1 ? '1 match' : `${count} matches`;
-  }, [filteredUsers.length, query.tokens.length]);
+  }, [filteredUsers.length, query]);
 
   return (
     <div className="min-h-screen bg-gray-100 py-8">

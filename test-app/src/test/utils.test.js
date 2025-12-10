@@ -11,6 +11,10 @@ import {
   validateIPAddress,
   validatePortNumber,
   validateTokenValue,
+  operatorToApi,
+  apiToOperator,
+  queryToApiFormat,
+  apiToQueryFormat,
 } from '../components/utils';
 
 describe('utils', () => {
@@ -334,6 +338,158 @@ describe('utils', () => {
     it('should handle portNumber alias', () => {
       const property = { validationType: 'portNumber' };
       expect(validateTokenValue('80', property).valid).toBe(true);
+    });
+  });
+
+  describe('operatorToApi', () => {
+    it('should convert internal operators to API format', () => {
+      expect(operatorToApi('=')).toBe('equals');
+      expect(operatorToApi('!=')).toBe('does-not-equal');
+      expect(operatorToApi(':')).toBe('contains');
+      expect(operatorToApi('!:')).toBe('does-not-contain');
+      expect(operatorToApi('^')).toBe('starts-with');
+      expect(operatorToApi('!^')).toBe('does-not-start-with');
+      expect(operatorToApi('>')).toBe('greater-than');
+      expect(operatorToApi('<')).toBe('less-than');
+      expect(operatorToApi('>=')).toBe('greater-than-or-equal');
+      expect(operatorToApi('<=')).toBe('less-than-or-equal');
+    });
+
+    it('should return original value for unknown operators', () => {
+      expect(operatorToApi('unknown')).toBe('unknown');
+    });
+  });
+
+  describe('apiToOperator', () => {
+    it('should convert API operators to internal format', () => {
+      expect(apiToOperator('equals')).toBe('=');
+      expect(apiToOperator('does-not-equal')).toBe('!=');
+      expect(apiToOperator('contains')).toBe(':');
+      expect(apiToOperator('does-not-contain')).toBe('!:');
+      expect(apiToOperator('starts-with')).toBe('^');
+      expect(apiToOperator('does-not-start-with')).toBe('!^');
+      expect(apiToOperator('greater-than')).toBe('>');
+      expect(apiToOperator('less-than')).toBe('<');
+      expect(apiToOperator('greater-than-or-equal')).toBe('>=');
+      expect(apiToOperator('less-than-or-equal')).toBe('<=');
+    });
+
+    it('should return original value for unknown operators', () => {
+      expect(apiToOperator('unknown')).toBe('unknown');
+    });
+  });
+
+  describe('queryToApiFormat', () => {
+    it('should convert internal query to API format with AND', () => {
+      const internalQuery = {
+        tokens: [
+          { propertyKey: 'name', operator: '=', value: 'abc' },
+          { propertyKey: 'email', operator: '!=', value: 'def@example.com' },
+        ],
+        operation: 'and',
+      };
+
+      const result = queryToApiFormat(internalQuery);
+
+      expect(result).toEqual({
+        filter: {
+          AND: [
+            { field: 'name', op: 'equals', value: 'abc' },
+            { field: 'email', op: 'does-not-equal', value: 'def@example.com' },
+          ],
+          OR: [],
+        },
+      });
+    });
+
+    it('should convert internal query to API format with OR', () => {
+      const internalQuery = {
+        tokens: [
+          { propertyKey: 'status', operator: ':', value: 'active' },
+        ],
+        operation: 'or',
+      };
+
+      const result = queryToApiFormat(internalQuery);
+
+      expect(result).toEqual({
+        filter: {
+          AND: [],
+          OR: [
+            { field: 'status', op: 'contains', value: 'active' },
+          ],
+        },
+      });
+    });
+
+    it('should handle empty tokens', () => {
+      const result = queryToApiFormat({ tokens: [], operation: 'and' });
+      expect(result).toEqual({ filter: { AND: [], OR: [] } });
+    });
+
+    it('should handle free text filters (null propertyKey)', () => {
+      const internalQuery = {
+        tokens: [{ propertyKey: undefined, operator: ':', value: 'search' }],
+        operation: 'and',
+      };
+
+      const result = queryToApiFormat(internalQuery);
+
+      expect(result.filter.AND[0].field).toBeNull();
+    });
+  });
+
+  describe('apiToQueryFormat', () => {
+    it('should convert API format to internal query with AND', () => {
+      const apiQuery = {
+        filter: {
+          AND: [
+            { field: 'name', op: 'equals', value: 'abc' },
+            { field: 'email', op: 'does-not-equal', value: 'def@example.com' },
+          ],
+          OR: [],
+        },
+      };
+
+      const result = apiToQueryFormat(apiQuery);
+
+      expect(result).toEqual({
+        tokens: [
+          { propertyKey: 'name', operator: '=', value: 'abc' },
+          { propertyKey: 'email', operator: '!=', value: 'def@example.com' },
+        ],
+        operation: 'and',
+      });
+    });
+
+    it('should convert API format to internal query with OR', () => {
+      const apiQuery = {
+        filter: {
+          AND: [],
+          OR: [
+            { field: 'status', op: 'contains', value: 'active' },
+          ],
+        },
+      };
+
+      const result = apiToQueryFormat(apiQuery);
+
+      expect(result).toEqual({
+        tokens: [
+          { propertyKey: 'status', operator: ':', value: 'active' },
+        ],
+        operation: 'or',
+      });
+    });
+
+    it('should handle empty filter', () => {
+      const result = apiToQueryFormat({ filter: { AND: [], OR: [] } });
+      expect(result).toEqual({ tokens: [], operation: 'and' });
+    });
+
+    it('should handle missing filter property', () => {
+      const result = apiToQueryFormat({});
+      expect(result).toEqual({ tokens: [], operation: 'and' });
     });
   });
 });

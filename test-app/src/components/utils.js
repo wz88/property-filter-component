@@ -172,6 +172,100 @@ export function generateId(prefix = 'pf') {
 }
 
 /**
+ * Map internal operator symbols to API operator names
+ */
+const operatorToApiMap = {
+  '=': 'equals',
+  '!=': 'does-not-equal',
+  ':': 'contains',
+  '!:': 'does-not-contain',
+  '^': 'starts-with',
+  '!^': 'does-not-start-with',
+  '>': 'greater-than',
+  '<': 'less-than',
+  '>=': 'greater-than-or-equal',
+  '<=': 'less-than-or-equal',
+};
+
+/**
+ * Map API operator names back to internal operator symbols
+ */
+const apiToOperatorMap = {
+  'equals': '=',
+  'does-not-equal': '!=',
+  'contains': ':',
+  'does-not-contain': '!:',
+  'starts-with': '^',
+  'does-not-start-with': '!^',
+  'greater-than': '>',
+  'less-than': '<',
+  'greater-than-or-equal': '>=',
+  'less-than-or-equal': '<=',
+};
+
+/**
+ * Convert internal operator to API format
+ * @param {string} operator - Internal operator symbol
+ * @returns {string} API operator name
+ */
+export function operatorToApi(operator) {
+  return operatorToApiMap[operator] || operator;
+}
+
+/**
+ * Convert API operator to internal format
+ * @param {string} apiOp - API operator name
+ * @returns {string} Internal operator symbol
+ */
+export function apiToOperator(apiOp) {
+  return apiToOperatorMap[apiOp] || apiOp;
+}
+
+/**
+ * Convert internal query format to API format
+ * @param {Object} query - Internal query {tokens, operation}
+ * @returns {Object} API query {filter: {AND: [], OR: []}}
+ */
+export function queryToApiFormat(query) {
+  const { tokens = [], operation = 'and' } = query;
+  
+  const filterItems = tokens.map(token => ({
+    field: token.propertyKey || null,
+    op: operatorToApi(token.operator),
+    value: token.value,
+  }));
+
+  return {
+    filter: {
+      AND: operation === 'and' ? filterItems : [],
+      OR: operation === 'or' ? filterItems : [],
+    },
+  };
+}
+
+/**
+ * Convert API format to internal query format
+ * @param {Object} apiQuery - API query {filter: {AND: [], OR: []}}
+ * @returns {Object} Internal query {tokens, operation}
+ */
+export function apiToQueryFormat(apiQuery) {
+  const { filter = {} } = apiQuery;
+  const { AND = [], OR = [] } = filter;
+
+  // Determine operation based on which array has items
+  const operation = OR.length > 0 ? 'or' : 'and';
+  const filterItems = operation === 'or' ? OR : AND;
+
+  const tokens = filterItems.map(item => ({
+    propertyKey: item.field,
+    operator: apiToOperator(item.op),
+    value: item.value,
+  }));
+
+  return { tokens, operation };
+}
+
+/**
  * Validate IP address with CIDR notation
  * Format: x.x.x.x/y where x is 0-255 and y is 22-32
  * @param {string} value - IP address string
