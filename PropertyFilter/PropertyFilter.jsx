@@ -5,7 +5,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import FilterAutosuggest from './FilterAutosuggest';
 import FilterToken from './FilterToken';
 import { getQueryActions, parseText, getAutosuggestOptions, formatToken } from './controller';
-import { getAllowedOperators, generateId } from './utils';
+import { getAllowedOperators, generateId, validateTokenValue } from './utils';
 
 /**
  * Default i18n strings
@@ -82,6 +82,7 @@ const PropertyFilter = forwardRef(function PropertyFilter(
   const inputRef = useRef(null);
   const [filteringText, setFilteringText] = useState('');
   const [showAllTokens, setShowAllTokens] = useState(false);
+  const [validationError, setValidationError] = useState(null);
 
   // Merge i18n strings
   const i18nStrings = useMemo(
@@ -174,9 +175,11 @@ const PropertyFilter = forwardRef(function PropertyFilter(
   const createToken = useCallback((currentText) => {
     const parsed = parseText(currentText, internalProperties, freeTextFiltering);
     let newToken;
+    let propertyForValidation = null;
 
     switch (parsed.step) {
       case 'property':
+        propertyForValidation = parsed.property;
         newToken = {
           property: parsed.property,
           propertyKey: parsed.property.key,
@@ -210,6 +213,16 @@ const PropertyFilter = forwardRef(function PropertyFilter(
     }
 
     if (newToken.value?.trim()) {
+      // Validate the token value if property has validation
+      if (propertyForValidation) {
+        const validation = validateTokenValue(newToken.value, propertyForValidation);
+        if (!validation.valid) {
+          setValidationError(validation.error);
+          return;
+        }
+      }
+      
+      setValidationError(null);
       addToken(newToken);
       setFilteringText('');
     }
@@ -273,7 +286,10 @@ const PropertyFilter = forwardRef(function PropertyFilter(
           <FilterAutosuggest
             ref={inputRef}
             value={filteringText}
-            onChange={setFilteringText}
+            onChange={(text) => {
+              setFilteringText(text);
+              if (validationError) setValidationError(null);
+            }}
             onOptionSelect={handleOptionSelect}
             options={autosuggestOptions.options}
             filterText={autosuggestOptions.filterText}
@@ -298,8 +314,17 @@ const PropertyFilter = forwardRef(function PropertyFilter(
         </div>
       </div>
 
+      {/* Validation error */}
+      {validationError && (
+        <div className="mt-1">
+          <Typography variant="small" className="text-red-500 font-medium">
+            {validationError}
+          </Typography>
+        </div>
+      )}
+
       {/* Constraint text */}
-      {filteringConstraintText && (
+      {filteringConstraintText && !validationError && (
         <div className="mt-1">
           <Typography variant="small" className="text-gray-500">
             {filteringConstraintText}

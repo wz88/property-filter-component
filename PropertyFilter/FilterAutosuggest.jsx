@@ -167,6 +167,12 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
   };
 
   const hasOptions = filteredOptions.some(group => group.options?.length > 0);
+  
+  // Show "Use: text" option only when typing free text (no keepOpenOnSelect options like properties/operators)
+  const hasKeepOpenOptions = filteredOptions.some(group => 
+    group.options?.some(opt => opt.keepOpenOnSelect)
+  );
+  const showEnteredTextOption = value.trim() && !disabled && !hasKeepOpenOptions;
 
   return (
     <div className="relative w-full">
@@ -191,8 +197,8 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
         />
       </div>
 
-      {/* Dropdown - hide when typing free text with no options */}
-      {isOpen && !disabled && (hasOptions || !value.trim()) && (
+      {/* Dropdown */}
+      {isOpen && !disabled && (hasOptions || showEnteredTextOption || !value.trim()) && (
         <div
           ref={dropdownRef}
           className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg 
@@ -206,6 +212,21 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
             </div>
           ) : (
             <>
+              {/* Entered text option - for free text filtering */}
+              {showEnteredTextOption && (
+                <ListItem
+                  className="py-2 px-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100"
+                  onClick={(e) => {
+                    onOptionSelect?.({ value: value.trim(), isEnteredText: true });
+                    setIsOpen(false);
+                  }}
+                >
+                  <Typography variant="small" className="text-blue-600 font-medium">
+                    {enteredTextLabel(value.trim())}
+                  </Typography>
+                </ListItem>
+              )}
+
               {/* Grouped options */}
               {filteredOptions.map((group, groupIndex) => (
                 <div key={group.label || groupIndex}>

@@ -170,3 +170,139 @@ export function getAllowedOperators(property) {
 export function generateId(prefix = 'pf') {
   return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 }
+
+/**
+ * Validate IP address with CIDR notation
+ * Format: x.x.x.x/y where x is 0-255 and y is 22-32
+ * @param {string} value - IP address string
+ * @returns {{ valid: boolean, error?: string }} Validation result
+ */
+export function validateIPAddress(value) {
+  if (!value || typeof value !== 'string') {
+    return { valid: false, error: 'IP address is required' };
+  }
+
+  const trimmed = value.trim();
+  
+  // Check for CIDR notation
+  const cidrMatch = trimmed.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/);
+  if (cidrMatch) {
+    const [, o1, o2, o3, o4, cidr] = cidrMatch;
+    const octets = [parseInt(o1), parseInt(o2), parseInt(o3), parseInt(o4)];
+    const cidrNum = parseInt(cidr);
+
+    // Validate octets (0-255)
+    for (const octet of octets) {
+      if (octet < 0 || octet > 255) {
+        return { valid: false, error: 'Each octet must be between 0 and 255' };
+      }
+    }
+
+    // Validate CIDR (22-32)
+    if (cidrNum < 22 || cidrNum > 32) {
+      return { valid: false, error: 'CIDR must be between 22 and 32' };
+    }
+
+    return { valid: true };
+  }
+
+  // Check for plain IP address (without CIDR)
+  const ipMatch = trimmed.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipMatch) {
+    const [, o1, o2, o3, o4] = ipMatch;
+    const octets = [parseInt(o1), parseInt(o2), parseInt(o3), parseInt(o4)];
+
+    for (const octet of octets) {
+      if (octet < 0 || octet > 255) {
+        return { valid: false, error: 'Each octet must be between 0 and 255' };
+      }
+    }
+
+    return { valid: true };
+  }
+
+  return { valid: false, error: 'Invalid IP address format. Use x.x.x.x or x.x.x.x/22-32' };
+}
+
+/**
+ * Validate port number or port range
+ * Formats: 
+ *   - Single port: 21, 22, 80, 443
+ *   - Range: 445-500 (start must be less than end)
+ *   - List: 21, 22, 80, 443
+ * @param {string} value - Port value string
+ * @returns {{ valid: boolean, error?: string }} Validation result
+ */
+export function validatePortNumber(value) {
+  if (!value || typeof value !== 'string') {
+    return { valid: false, error: 'Port number is required' };
+  }
+
+  const trimmed = value.trim();
+
+  // Check for single port number
+  const singlePortMatch = trimmed.match(/^(\d+)$/);
+  if (singlePortMatch) {
+    const port = parseInt(singlePortMatch[1]);
+    if (port < 1 || port > 65535) {
+      return { valid: false, error: 'Port must be between 1 and 65535' };
+    }
+    return { valid: true };
+  }
+
+  // Check for port range start-end (e.g., 445-500)
+  const rangeMatch = trimmed.match(/^(\d+)-(\d+)$/);
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1]);
+    const end = parseInt(rangeMatch[2]);
+
+    if (start < 1 || start > 65535 || end < 1 || end > 65535) {
+      return { valid: false, error: 'Ports must be between 1 and 65535' };
+    }
+
+    if (start >= end) {
+      return { valid: false, error: 'Range start must be less than end (e.g., 445-500, not 500-445)' };
+    }
+
+    return { valid: true };
+  }
+
+  // Check for port list (e.g., 21, 22, 80, 443)
+  if (trimmed.includes(',')) {
+    const ports = trimmed.split(',').map(p => p.trim());
+
+    for (const portStr of ports) {
+      const port = parseInt(portStr);
+      if (isNaN(port) || port < 1 || port > 65535) {
+        return { valid: false, error: `Invalid port "${portStr}". Ports must be between 1 and 65535` };
+      }
+    }
+
+    return { valid: true };
+  }
+
+  return { valid: false, error: 'Invalid port format. Use: 80, 445-500, or 21, 22, 80, 443' };
+}
+
+/**
+ * Validate a token value based on property type
+ * @param {string} value - Value to validate
+ * @param {Object} property - Property definition with optional validationType
+ * @returns {{ valid: boolean, error?: string }} Validation result
+ */
+export function validateTokenValue(value, property) {
+  if (!property || !property.validationType) {
+    return { valid: true };
+  }
+
+  switch (property.validationType) {
+    case 'ip':
+    case 'ipAddress':
+      return validateIPAddress(value);
+    case 'port':
+    case 'portNumber':
+      return validatePortNumber(value);
+    default:
+      return { valid: true };
+  }
+}

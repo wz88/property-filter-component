@@ -276,6 +276,66 @@ describe('FilterAutosuggest', () => {
       // Multiple options have the same prefix, just check at least one exists
       expect(screen.getAllByText('Status =').length).toBeGreaterThan(0);
     });
+
+    it('should show "Use:" option for free text (no keepOpenOnSelect options)', async () => {
+      const user = userEvent.setup();
+      // Options without keepOpenOnSelect - simulates typing a value after property/operator
+      const valueOptions = [
+        {
+          label: 'Values',
+          options: [
+            { value: 'Status = active', label: 'Active' },
+          ],
+        },
+      ];
+      render(<FilterAutosuggest {...defaultProps} options={valueOptions} value="test" />);
+
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+
+      expect(screen.getByText('Use: "test"')).toBeInTheDocument();
+    });
+
+    it('should NOT show "Use:" option when keepOpenOnSelect options exist', async () => {
+      const user = userEvent.setup();
+      render(<FilterAutosuggest {...defaultProps} value="test" />);
+
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+
+      // Should NOT show "Use:" when properties (keepOpenOnSelect) are shown
+      expect(screen.queryByText('Use: "test"')).not.toBeInTheDocument();
+    });
+
+    it('should call onOptionSelect when clicking "Use:" option', async () => {
+      const user = userEvent.setup();
+      const onOptionSelect = vi.fn();
+      const valueOptions = [
+        {
+          label: 'Values',
+          options: [{ value: 'Status = active', label: 'Active' }],
+        },
+      ];
+      render(
+        <FilterAutosuggest
+          {...defaultProps}
+          options={valueOptions}
+          value="my search"
+          onOptionSelect={onOptionSelect}
+        />
+      );
+
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+
+      const useOption = screen.getByText('Use: "my search"');
+      await user.click(useOption);
+
+      expect(onOptionSelect).toHaveBeenCalledWith({
+        value: 'my search',
+        isEnteredText: true,
+      });
+    });
   });
 
   describe('filtering', () => {

@@ -8,6 +8,9 @@ import {
   removeOperator,
   tokenGroupToTokens,
   getAllowedOperators,
+  validateIPAddress,
+  validatePortNumber,
+  validateTokenValue,
 } from '../components/utils';
 
 describe('utils', () => {
@@ -212,6 +215,125 @@ describe('utils', () => {
       const property = { defaultOperator: '=' };
       const result = getAllowedOperators(property);
       expect(result).toEqual(['=']);
+    });
+  });
+
+  describe('validateIPAddress', () => {
+    it('should validate valid IP address', () => {
+      expect(validateIPAddress('192.168.1.1')).toEqual({ valid: true });
+      expect(validateIPAddress('10.0.0.1')).toEqual({ valid: true });
+      expect(validateIPAddress('255.255.255.255')).toEqual({ valid: true });
+      expect(validateIPAddress('0.0.0.0')).toEqual({ valid: true });
+    });
+
+    it('should validate valid IP with CIDR', () => {
+      expect(validateIPAddress('192.168.1.0/24')).toEqual({ valid: true });
+      expect(validateIPAddress('10.0.0.0/22')).toEqual({ valid: true });
+      expect(validateIPAddress('172.16.0.0/32')).toEqual({ valid: true });
+    });
+
+    it('should reject invalid CIDR range', () => {
+      const result1 = validateIPAddress('192.168.1.0/21');
+      expect(result1.valid).toBe(false);
+      expect(result1.error).toContain('CIDR must be between 22 and 32');
+
+      const result2 = validateIPAddress('192.168.1.0/33');
+      expect(result2.valid).toBe(false);
+    });
+
+    it('should reject invalid octets', () => {
+      const result1 = validateIPAddress('256.168.1.1');
+      expect(result1.valid).toBe(false);
+      expect(result1.error).toContain('octet');
+
+      const result2 = validateIPAddress('192.168.1.300');
+      expect(result2.valid).toBe(false);
+    });
+
+    it('should reject invalid format', () => {
+      expect(validateIPAddress('192.168.1').valid).toBe(false);
+      expect(validateIPAddress('192.168.1.1.1').valid).toBe(false);
+      expect(validateIPAddress('abc.def.ghi.jkl').valid).toBe(false);
+      expect(validateIPAddress('').valid).toBe(false);
+      expect(validateIPAddress(null).valid).toBe(false);
+    });
+  });
+
+  describe('validatePortNumber', () => {
+    it('should validate single port number', () => {
+      expect(validatePortNumber('80')).toEqual({ valid: true });
+      expect(validatePortNumber('443')).toEqual({ valid: true });
+      expect(validatePortNumber('21')).toEqual({ valid: true });
+      expect(validatePortNumber('65535')).toEqual({ valid: true });
+    });
+
+    it('should reject invalid single port', () => {
+      const result1 = validatePortNumber('0');
+      expect(result1.valid).toBe(false);
+
+      const result2 = validatePortNumber('65536');
+      expect(result2.valid).toBe(false);
+    });
+
+    it('should validate port range', () => {
+      expect(validatePortNumber('445-500')).toEqual({ valid: true });
+      expect(validatePortNumber('1-65535')).toEqual({ valid: true });
+      expect(validatePortNumber('80-443')).toEqual({ valid: true });
+    });
+
+    it('should reject invalid port range (start >= end)', () => {
+      const result1 = validatePortNumber('500-445');
+      expect(result1.valid).toBe(false);
+      expect(result1.error).toContain('start must be less than end');
+
+      const result2 = validatePortNumber('500-500');
+      expect(result2.valid).toBe(false);
+    });
+
+    it('should validate port list', () => {
+      expect(validatePortNumber('21, 22, 80, 443')).toEqual({ valid: true });
+      expect(validatePortNumber('80,443,8080')).toEqual({ valid: true });
+    });
+
+    it('should reject invalid port in list', () => {
+      const result = validatePortNumber('21, 0, 80');
+      expect(result.valid).toBe(false);
+    });
+
+    it('should reject invalid format', () => {
+      expect(validatePortNumber('abc').valid).toBe(false);
+      expect(validatePortNumber('').valid).toBe(false);
+      expect(validatePortNumber(null).valid).toBe(false);
+    });
+  });
+
+  describe('validateTokenValue', () => {
+    it('should return valid for no validation type', () => {
+      expect(validateTokenValue('anything', {})).toEqual({ valid: true });
+      expect(validateTokenValue('anything', null)).toEqual({ valid: true });
+    });
+
+    it('should validate IP address type', () => {
+      const property = { validationType: 'ip' };
+      expect(validateTokenValue('192.168.1.1', property).valid).toBe(true);
+      expect(validateTokenValue('invalid', property).valid).toBe(false);
+    });
+
+    it('should validate port type', () => {
+      const property = { validationType: 'port' };
+      expect(validateTokenValue('80', property).valid).toBe(true);
+      expect(validateTokenValue('445-500', property).valid).toBe(true);
+      expect(validateTokenValue('invalid', property).valid).toBe(false);
+    });
+
+    it('should handle ipAddress alias', () => {
+      const property = { validationType: 'ipAddress' };
+      expect(validateTokenValue('192.168.1.1', property).valid).toBe(true);
+    });
+
+    it('should handle portNumber alias', () => {
+      const property = { validationType: 'portNumber' };
+      expect(validateTokenValue('80', property).valid).toBe(true);
     });
   });
 });

@@ -51,6 +51,22 @@ const FILTERING_PROPERTIES = [
     operators: ['=', '!=', ':'],
     defaultOperator: '=',
   },
+  {
+    key: 'ip',
+    propertyLabel: 'IP Address',
+    groupValuesLabel: 'IP Address values',
+    operators: ['=', '!='],
+    defaultOperator: '=',
+    validationType: 'ip',
+  },
+  {
+    key: 'port',
+    propertyLabel: 'Port',
+    groupValuesLabel: 'Port values',
+    operators: ['=', '!='],
+    defaultOperator: '=',
+    validationType: 'port',
+  },
 ];
 
 // Define filtering options (suggestions)
@@ -177,6 +193,8 @@ function App() {
               <li>• Use operators: = (equals), != (not equals), : (contains), !: (not contains), ^ (starts with)</li>
               <li>• Type any text to search across all fields</li>
               <li>• Click AND/OR between tokens to change the join logic</li>
+              <li>• <strong>IP Address</strong>: Use format x.x.x.x or x.x.x.x/22-32 (CIDR)</li>
+              <li>• <strong>Port</strong>: Use 80, 445-500 (range), or 21, 22, 80, 443 (list)</li>
             </ul>
           </div>
         </Card>
