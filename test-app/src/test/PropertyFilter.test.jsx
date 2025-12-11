@@ -24,7 +24,7 @@ describe('PropertyFilter', () => {
       { propertyKey: 'status', value: 'active', label: 'Active' },
       { propertyKey: 'status', value: 'inactive', label: 'Inactive' },
     ],
-    query: { filter: { AND: [], OR: [] } },
+    query: { filter: { and: [], or: [] } },
     onChange: vi.fn(),
   };
 
@@ -62,8 +62,8 @@ describe('PropertyFilter', () => {
     it('should render existing tokens', () => {
       const query = {
         filter: {
-          AND: [{ field: 'status', op: 'equals', value: 'active' }],
-          OR: [],
+          and: [{ field: 'status', op: 'equals', value: 'active' }],
+          or: [],
         },
       };
       
@@ -77,8 +77,8 @@ describe('PropertyFilter', () => {
     it('should render count text when tokens exist', () => {
       const query = {
         filter: {
-          AND: [{ field: 'status', op: 'equals', value: 'active' }],
-          OR: [],
+          and: [{ field: 'status', op: 'equals', value: 'active' }],
+          or: [],
         },
       };
       
@@ -151,8 +151,8 @@ describe('PropertyFilter', () => {
       
       expect(onChange).toHaveBeenCalledWith({
         filter: {
-          AND: [{ field: null, op: 'contains', value: 'search term' }],
-          OR: [],
+          and: [{ field: null, op: 'contains', value: 'search term' }],
+          or: [],
         },
       });
     });
@@ -168,8 +168,8 @@ describe('PropertyFilter', () => {
       
       expect(onChange).toHaveBeenCalledWith({
         filter: {
-          AND: [{ field: 'status', op: 'equals', value: 'active' }],
-          OR: [],
+          and: [{ field: 'status', op: 'equals', value: 'active' }],
+          or: [],
         },
       });
     });
@@ -191,8 +191,8 @@ describe('PropertyFilter', () => {
       const onChange = vi.fn();
       const query = {
         filter: {
-          AND: [{ field: 'status', op: 'equals', value: 'active' }],
-          OR: [],
+          and: [{ field: 'status', op: 'equals', value: 'active' }],
+          or: [],
         },
       };
       
@@ -204,7 +204,7 @@ describe('PropertyFilter', () => {
       await user.click(clearButton);
       
       expect(onChange).toHaveBeenCalledWith({
-        filter: { AND: [], OR: [] },
+        filter: { and: [], or: [] },
       });
     });
   });
@@ -213,11 +213,11 @@ describe('PropertyFilter', () => {
     it('should render operation selector between tokens', () => {
       const query = {
         filter: {
-          AND: [
+          and: [
             { field: 'status', op: 'equals', value: 'active' },
             { field: 'name', op: 'contains', value: 'john' },
           ],
-          OR: [],
+          or: [],
         },
       };
       
@@ -229,11 +229,11 @@ describe('PropertyFilter', () => {
     it('should hide operations when hideOperations is true', () => {
       const query = {
         filter: {
-          AND: [
+          and: [
             { field: 'status', op: 'equals', value: 'active' },
             { field: 'name', op: 'contains', value: 'john' },
           ],
-          OR: [],
+          or: [],
         },
       };
       
@@ -249,12 +249,12 @@ describe('PropertyFilter', () => {
     it('should show "Show more" when tokens exceed limit', () => {
       const query = {
         filter: {
-          AND: [
+          and: [
             { field: 'status', op: 'equals', value: 'active' },
             { field: 'name', op: 'contains', value: 'john' },
             { field: 'name', op: 'contains', value: 'jane' },
           ],
-          OR: [],
+          or: [],
         },
       };
       
@@ -304,8 +304,8 @@ describe('PropertyFilter', () => {
     it('should use custom i18n strings', () => {
       const query = {
         filter: {
-          AND: [{ field: 'status', op: 'equals', value: 'active' }],
-          OR: [],
+          and: [{ field: 'status', op: 'equals', value: 'active' }],
+          or: [],
         },
       };
       
@@ -339,12 +339,12 @@ describe('PropertyFilter', () => {
       const user = userEvent.setup();
       const query = {
         filter: {
-          AND: [
+          and: [
             { field: 'status', op: 'equals', value: 'active' },
             { field: 'name', op: 'contains', value: 'john' },
             { field: 'name', op: 'contains', value: 'jane' },
           ],
-          OR: [],
+          or: [],
         },
       };
       
@@ -423,8 +423,8 @@ describe('PropertyFilter', () => {
     it('should render custom filter actions instead of clear button', () => {
       const query = {
         filter: {
-          AND: [{ field: 'status', op: 'equals', value: 'active' }],
-          OR: [],
+          and: [{ field: 'status', op: 'equals', value: 'active' }],
+          or: [],
         },
       };
       

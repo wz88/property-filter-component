@@ -95,8 +95,8 @@ describe('controller', () => {
       // Now outputs API format
       expect(onChange).toHaveBeenCalledWith({
         filter: {
-          AND: [{ field: null, op: 'contains', value: 'test' }],
-          OR: [],
+          and: [{ field: null, op: 'contains', value: 'test' }],
+          or: [],
         },
       });
     });
@@ -116,8 +116,8 @@ describe('controller', () => {
 
       expect(onChange).toHaveBeenCalledWith({
         filter: {
-          AND: [{ field: null, op: 'contains', value: 'second' }],
-          OR: [],
+          and: [{ field: null, op: 'contains', value: 'second' }],
+          or: [],
         },
       });
     });
@@ -136,7 +136,7 @@ describe('controller', () => {
       removeAllTokens();
 
       expect(onChange).toHaveBeenCalledWith({
-        filter: { AND: [], OR: [] },
+        filter: { and: [], or: [] },
       });
     });
 
@@ -148,7 +148,7 @@ describe('controller', () => {
       updateOperation('or');
 
       expect(onChange).toHaveBeenCalledWith({
-        filter: { AND: [], OR: [] },
+        filter: { and: [], or: [] },
       });
     });
   });

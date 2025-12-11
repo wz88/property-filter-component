@@ -223,17 +223,17 @@ describe('utils', () => {
   });
 
   describe('validateIPAddress', () => {
-    it('should validate valid IP address', () => {
-      expect(validateIPAddress('192.168.1.1')).toEqual({ valid: true });
-      expect(validateIPAddress('10.0.0.1')).toEqual({ valid: true });
-      expect(validateIPAddress('255.255.255.255')).toEqual({ valid: true });
-      expect(validateIPAddress('0.0.0.0')).toEqual({ valid: true });
+    it('should validate valid IP address and append /32', () => {
+      expect(validateIPAddress('192.168.1.1')).toEqual({ valid: true, normalizedValue: '192.168.1.1/32' });
+      expect(validateIPAddress('10.0.0.1')).toEqual({ valid: true, normalizedValue: '10.0.0.1/32' });
+      expect(validateIPAddress('255.255.255.255')).toEqual({ valid: true, normalizedValue: '255.255.255.255/32' });
+      expect(validateIPAddress('0.0.0.0')).toEqual({ valid: true, normalizedValue: '0.0.0.0/32' });
     });
 
-    it('should validate valid IP with CIDR', () => {
-      expect(validateIPAddress('192.168.1.0/24')).toEqual({ valid: true });
-      expect(validateIPAddress('10.0.0.0/22')).toEqual({ valid: true });
-      expect(validateIPAddress('172.16.0.0/32')).toEqual({ valid: true });
+    it('should validate valid IP with CIDR and preserve it', () => {
+      expect(validateIPAddress('192.168.1.0/24')).toEqual({ valid: true, normalizedValue: '192.168.1.0/24' });
+      expect(validateIPAddress('10.0.0.0/22')).toEqual({ valid: true, normalizedValue: '10.0.0.0/22' });
+      expect(validateIPAddress('172.16.0.0/32')).toEqual({ valid: true, normalizedValue: '172.16.0.0/32' });
     });
 
     it('should reject invalid CIDR range', () => {
@@ -393,11 +393,11 @@ describe('utils', () => {
 
       expect(result).toEqual({
         filter: {
-          AND: [
+          and: [
             { field: 'name', op: 'equals', value: 'abc' },
             { field: 'email', op: 'does-not-equal', value: 'def@example.com' },
           ],
-          OR: [],
+          or: [],
         },
       });
     });
@@ -414,8 +414,8 @@ describe('utils', () => {
 
       expect(result).toEqual({
         filter: {
-          AND: [],
-          OR: [
+          and: [],
+          or: [
             { field: 'status', op: 'contains', value: 'active' },
           ],
         },
@@ -424,7 +424,7 @@ describe('utils', () => {
 
     it('should handle empty tokens', () => {
       const result = queryToApiFormat({ tokens: [], operation: 'and' });
-      expect(result).toEqual({ filter: { AND: [], OR: [] } });
+      expect(result).toEqual({ filter: { and: [], or: [] } });
     });
 
     it('should handle free text filters (null propertyKey)', () => {
@@ -435,7 +435,7 @@ describe('utils', () => {
 
       const result = queryToApiFormat(internalQuery);
 
-      expect(result.filter.AND[0].field).toBeNull();
+      expect(result.filter.and[0].field).toBeNull();
     });
   });
 
@@ -443,11 +443,11 @@ describe('utils', () => {
     it('should convert API format to internal query with AND', () => {
       const apiQuery = {
         filter: {
-          AND: [
+          and: [
             { field: 'name', op: 'equals', value: 'abc' },
             { field: 'email', op: 'does-not-equal', value: 'def@example.com' },
           ],
-          OR: [],
+          or: [],
         },
       };
 
@@ -465,8 +465,8 @@ describe('utils', () => {
     it('should convert API format to internal query with OR', () => {
       const apiQuery = {
         filter: {
-          AND: [],
-          OR: [
+          and: [],
+          or: [
             { field: 'status', op: 'contains', value: 'active' },
           ],
         },
@@ -483,7 +483,7 @@ describe('utils', () => {
     });
 
     it('should handle empty filter', () => {
-      const result = apiToQueryFormat({ filter: { AND: [], OR: [] } });
+      const result = apiToQueryFormat({ filter: { and: [], or: [] } });
       expect(result).toEqual({ tokens: [], operation: 'and' });
     });
 

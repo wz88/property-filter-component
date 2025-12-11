@@ -105,11 +105,11 @@ const operatorFunctions = {
 // Apply filters to data (using new API format)
 function applyFilters(data, query) {
   const { filter = {} } = query;
-  const { AND = [], OR = [] } = filter;
+  const { and = [], or = [] } = filter;
   
   // Determine which filters to apply
-  const hasAndFilters = AND.length > 0;
-  const hasOrFilters = OR.length > 0;
+  const hasAndFilters = and.length > 0;
+  const hasOrFilters = or.length > 0;
   
   if (!hasAndFilters && !hasOrFilters) {
     return data;
@@ -136,12 +136,12 @@ function applyFilters(data, query) {
 
     // Apply AND logic
     if (hasAndFilters) {
-      return AND.every(evaluateFilter);
+      return and.every(evaluateFilter);
     }
     
     // Apply OR logic
     if (hasOrFilters) {
-      return OR.some(evaluateFilter);
+      return or.some(evaluateFilter);
     }
 
     return true;
@@ -151,8 +151,8 @@ function applyFilters(data, query) {
 function App() {
   const [query, setQuery] = useState({
     filter: {
-      AND: [],
-      OR: [],
+      and: [],
+      or: [],
     },
   });
 
@@ -162,7 +162,7 @@ function App() {
   // Count text
   const countText = useMemo(() => {
     const { filter = {} } = query;
-    const totalFilters = (filter.AND?.length || 0) + (filter.OR?.length || 0);
+    const totalFilters = (filter.and?.length || 0) + (filter.or?.length || 0);
     if (totalFilters === 0) return undefined;
     const count = filteredUsers.length;
     return count === 1 ? '1 match' : `${count} matches`;

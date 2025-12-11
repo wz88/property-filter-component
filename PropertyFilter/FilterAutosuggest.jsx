@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Input, List, ListItem, Typography, Spinner } from '@material-tailwind/react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
@@ -45,14 +45,6 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
   }), []);
 
   const { enteredTextLabel = (text) => `Use: "${text}"` } = i18nStrings;
-
-  // Flatten options for keyboard navigation
-  const flattenedOptions = options.reduce((acc, group) => {
-    if (group.options) {
-      return [...acc, ...group.options.map(opt => ({ ...opt, groupLabel: group.label }))];
-    }
-    return acc;
-  }, []);
 
   // Filter options based on filterText
   const filteredOptions = filterText

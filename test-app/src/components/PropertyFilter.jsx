@@ -5,7 +5,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import FilterAutosuggest from './FilterAutosuggest';
 import FilterToken from './FilterToken';
 import { getQueryActions, parseText, getAutosuggestOptions, formatToken } from './controller';
-import { getAllowedOperators, generateId, validateTokenValue, apiToQueryFormat } from './utils';
+import { validateTokenValue, apiToQueryFormat } from './utils';
 
 /**
  * Default i18n strings
@@ -140,7 +140,7 @@ const PropertyFilter = forwardRef(function PropertyFilter(
 
   // Convert API format query to internal format with property references
   const internalQuery = useMemo(() => {
-    // Convert from API format {filter: {AND: [], OR: []}} to internal format
+    // Convert from API format {filter: {and: [], or: []}} to internal format
     const converted = apiToQueryFormat(query);
     
     return {
@@ -224,6 +224,10 @@ const PropertyFilter = forwardRef(function PropertyFilter(
         if (!validation.valid) {
           setValidationError(validation.error);
           return;
+        }
+        // Use normalized value if provided (e.g., IP with /32 appended)
+        if (validation.normalizedValue) {
+          newToken.value = validation.normalizedValue;
         }
       }
       

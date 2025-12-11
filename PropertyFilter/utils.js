@@ -163,15 +163,6 @@ export function getAllowedOperators(property) {
 }
 
 /**
- * Generate unique ID
- * @param {string} prefix - ID prefix
- * @returns {string} Unique ID
- */
-export function generateId(prefix = 'pf') {
-  return `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
  * Map internal operator symbols to API operator names
  */
 const operatorToApiMap = {
@@ -224,7 +215,7 @@ export function apiToOperator(apiOp) {
 /**
  * Convert internal query format to API format
  * @param {Object} query - Internal query {tokens, operation}
- * @returns {Object} API query {filter: {AND: [], OR: []}}
+ * @returns {Object} API query {filter: {and: [], or: []}}
  */
 export function queryToApiFormat(query) {
   const { tokens = [], operation = 'and' } = query;
@@ -237,24 +228,24 @@ export function queryToApiFormat(query) {
 
   return {
     filter: {
-      AND: operation === 'and' ? filterItems : [],
-      OR: operation === 'or' ? filterItems : [],
+      and: operation === 'and' ? filterItems : [],
+      or: operation === 'or' ? filterItems : [],
     },
   };
 }
 
 /**
  * Convert API format to internal query format
- * @param {Object} apiQuery - API query {filter: {AND: [], OR: []}}
+ * @param {Object} apiQuery - API query {filter: {and: [], or: []}}
  * @returns {Object} Internal query {tokens, operation}
  */
 export function apiToQueryFormat(apiQuery) {
   const { filter = {} } = apiQuery;
-  const { AND = [], OR = [] } = filter;
+  const { and = [], or = [] } = filter;
 
   // Determine operation based on which array has items
-  const operation = OR.length > 0 ? 'or' : 'and';
-  const filterItems = operation === 'or' ? OR : AND;
+  const operation = or.length > 0 ? 'or' : 'and';
+  const filterItems = operation === 'or' ? or : and;
 
   const tokens = filterItems.map(item => ({
     propertyKey: item.field,
@@ -269,7 +260,7 @@ export function apiToQueryFormat(apiQuery) {
  * Validate IP address with CIDR notation
  * Format: x.x.x.x/y where x is 0-255 and y is 22-32
  * @param {string} value - IP address string
- * @returns {{ valid: boolean, error?: string }} Validation result
+ * @returns {{ valid: boolean, error?: string, normalizedValue?: string }} Validation result with normalized value
  */
 export function validateIPAddress(value) {
   if (!value || typeof value !== 'string') {
@@ -297,7 +288,7 @@ export function validateIPAddress(value) {
       return { valid: false, error: 'CIDR must be between 22 and 32' };
     }
 
-    return { valid: true };
+    return { valid: true, normalizedValue: trimmed };
   }
 
   // Check for plain IP address (without CIDR)
@@ -312,7 +303,8 @@ export function validateIPAddress(value) {
       }
     }
 
-    return { valid: true };
+    // Append /32 for host addresses without CIDR
+    return { valid: true, normalizedValue: `${trimmed}/32` };
   }
 
   return { valid: false, error: 'Invalid IP address format. Use x.x.x.x or x.x.x.x/22-32' };
@@ -382,7 +374,7 @@ export function validatePortNumber(value) {
  * Validate a token value based on property type
  * @param {string} value - Value to validate
  * @param {Object} property - Property definition with optional validationType
- * @returns {{ valid: boolean, error?: string }} Validation result
+ * @returns {{ valid: boolean, error?: string, normalizedValue?: string }} Validation result with optional normalized value
  */
 export function validateTokenValue(value, property) {
   if (!property || !property.validationType) {
