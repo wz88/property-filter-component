@@ -182,6 +182,17 @@ const PropertyFilter = forwardRef(function PropertyFilter(
   const [filteringText, setFilteringText] = useState('');  // Current input text
   const [showAllTokens, setShowAllTokens] = useState(false); // Token limit toggle
   const [validationError, setValidationError] = useState(null); // Validation error message
+  
+  /**
+   * PENDING NESTED SELECTION - Tracks when user selects an option with nested sub-options.
+   * 
+   * When user selects an option that has nestedOptions (e.g., ICMP protocol),
+   * we store the parent option here and show the nested options in the dropdown.
+   * When user selects a nested option, we create multiple tokens.
+   * 
+   * Structure: { parentOption, property, operator } or null
+   */
+  const [pendingNestedSelection, setPendingNestedSelection] = useState(null);
 
   // ==========================================================================
   // MEMOIZED VALUES - Computed values that update when dependencies change
@@ -339,7 +350,7 @@ const PropertyFilter = forwardRef(function PropertyFilter(
    * NOTE: This returns NEW function references when dependencies change,
    * which is why we memoize it - to avoid unnecessary re-renders.
    */
-  const { addToken, updateToken, updateOperation, removeToken, removeAllTokens } = useMemo(
+  const { addToken, addTokens, updateToken, updateOperation, removeToken, removeAllTokens } = useMemo(
     () => getQueryActions({
       query: internalQuery,
       onChange: (newQuery) => onChange?.(newQuery),
@@ -375,13 +386,40 @@ const PropertyFilter = forwardRef(function PropertyFilter(
    * - If at 'property' step: Show matching values for that property
    * - If at 'operator' step: Show available operators
    * - If at 'free-text' step: Show properties and matching values
+   * - If pendingNestedSelection: Show nested options for the parent selection
    * 
    * Returns: { filterText: string, options: Array<{label, options}> }
    */
-  const autosuggestOptions = useMemo(
-    () => getAutosuggestOptions(parsedText, internalProperties, internalOptions, i18nStrings),
-    [parsedText, internalProperties, internalOptions, i18nStrings]
-  );
+  const autosuggestOptions = useMemo(() => {
+    // If there's a pending nested selection, show nested options instead
+    if (pendingNestedSelection) {
+      const { parentOption, property, operator } = pendingNestedSelection;
+      const nestedOpts = parentOption.nestedOptions;
+      
+      const result = {
+        filterText: '',
+        options: [
+          {
+            label: nestedOpts.groupLabel || 'Select option',
+            options: nestedOpts.options.map(opt => ({
+              value: opt.value,
+              label: opt.label || opt.value,
+              isNestedOption: true, // Mark as nested for handleOptionSelect
+              parentOption: parentOption,
+              nestedConfig: nestedOpts,
+              // Include property and operator directly so we don't need to read from state
+              nestedProperty: property,
+              nestedOperator: operator,
+            })),
+          },
+        ],
+      };
+      return result;
+    }
+    
+    // Normal autosuggest options
+    return getAutosuggestOptions(parsedText, internalProperties, internalOptions, i18nStrings);
+  }, [parsedText, internalProperties, internalOptions, i18nStrings, pendingNestedSelection]);
 
   // ==========================================================================
   // CALLBACKS - Event handlers wrapped in useCallback for performance
@@ -485,6 +523,8 @@ const PropertyFilter = forwardRef(function PropertyFilter(
    * HANDLE OPTION SELECT - Called when user clicks/selects a dropdown option.
    * 
    * Different options have different behaviors:
+   * - isNestedOption: User clicked a nested sub-option → create multiple tokens
+   * - hasNestedOptions: User clicked option with sub-options → show nested options
    * - isEnteredText: User clicked "Use: text" → create free text token
    * - keepOpenOnSelect: User clicked property/operator → update input, keep dropdown
    * - Regular option: User clicked value → create token, close dropdown
@@ -492,7 +532,36 @@ const PropertyFilter = forwardRef(function PropertyFilter(
    * @param {Object} option - The selected option from dropdown
    */
   const handleOptionSelect = useCallback((option) => {
-    if (!option.value) return; // Ignore empty options
+    if (!option.value && !option.isNestedOption) return; // Ignore empty options
+
+    // NESTED OPTION SELECTED - Create multiple tokens
+    // This happens when user selects from the nested options dropdown (e.g., ICMP type)
+    if (option.isNestedOption) {
+      const { parentOption, nestedConfig, nestedProperty, nestedOperator } = option;
+      
+      // Create the parent token (e.g., protocol = icmp)
+      const parentToken = {
+        property: nestedProperty,
+        propertyKey: nestedProperty.key,
+        operator: nestedOperator,
+        value: parentOption.value,
+      };
+      
+      // Create the additional token (e.g., types-and-codes = echo-and-echo-reply)
+      const additionalToken = {
+        property: null, // This is a related field, not a defined property
+        propertyKey: nestedConfig.additionalTokenField,
+        operator: '=',
+        value: option.value,
+      };
+      
+      // Add both tokens at once (using addTokens to avoid state batching issues)
+      setValidationError(null);
+      addTokens([parentToken, additionalToken]);
+      setFilteringText('');
+      setPendingNestedSelection(null);
+      return;
+    }
 
     // "Use: text" option - create free text token
     if (option.isEnteredText) {
@@ -503,13 +572,30 @@ const PropertyFilter = forwardRef(function PropertyFilter(
     // Property or operator selection - update input but keep typing
     // This allows: click "Status" → input becomes "Status" → show operators
     if (option.keepOpenOnSelect) {
+      // Check if this option has nested options (e.g., ICMP protocol)
+      if (option.nestedOptions && option.originalOption) {
+        const parsed = parseText(option.value, internalProperties, freeTextFiltering);
+        
+        // Store pending selection and show nested options
+        setPendingNestedSelection({
+          parentOption: option.originalOption,
+          property: parsed.property,
+          operator: parsed.operator,
+        });
+        // Set a placeholder text to indicate nested selection is in progress
+        const newText = `${parsed.property.propertyLabel} ${parsed.operator} ${option.originalOption.label} → `;
+        setFilteringText(newText);
+        return;
+      }
+      
+      // Regular keepOpenOnSelect (property/operator selection)
       setFilteringText(option.value);
       return;
     }
 
     // Regular value selection - create the token
     createToken(option.value);
-  }, [createToken]);
+  }, [createToken, addTokens, internalProperties, freeTextFiltering]);
 
   /**
    * HANDLE LOAD ITEMS - Called for async/paginated option loading.
@@ -598,6 +684,10 @@ const PropertyFilter = forwardRef(function PropertyFilter(
               setFilteringText(text);
               // Clear validation error when user starts typing again
               if (validationError) setValidationError(null);
+              // Clear pending nested selection if user modifies the text
+              if (pendingNestedSelection && !text.includes('→')) {
+                setPendingNestedSelection(null);
+              }
             }}
             onOptionSelect={handleOptionSelect}
             options={autosuggestOptions.options}

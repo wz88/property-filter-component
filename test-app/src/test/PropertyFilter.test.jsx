@@ -490,4 +490,285 @@ describe('PropertyFilter', () => {
       expect(typeof ref.current.focus).toBe('function');
     });
   });
+
+  describe('nested token selection', () => {
+    const nestedProps = {
+      filteringProperties: [
+        {
+          key: 'protocol',
+          propertyLabel: 'Protocol',
+          groupValuesLabel: 'Protocol values',
+          operators: ['=', '!='],
+          defaultOperator: '=',
+        },
+        {
+          key: 'types-and-codes',
+          propertyLabel: 'Types & Codes',
+          operators: ['=', '!='],
+          defaultOperator: '=',
+          hidden: true,
+        },
+      ],
+      filteringOptions: [
+        { propertyKey: 'protocol', value: 'tcp', label: 'TCP' },
+        { propertyKey: 'protocol', value: 'udp', label: 'UDP' },
+        {
+          propertyKey: 'protocol',
+          value: 'icmp',
+          label: 'ICMP',
+          nestedOptions: {
+            groupLabel: 'ICMP Types',
+            additionalTokenField: 'types-and-codes',
+            options: [
+              { value: 'echo', label: 'Echo' },
+              { value: 'echo-reply', label: 'Echo Reply' },
+            ],
+          },
+        },
+      ],
+      query: { filter: { and: [], or: [] } },
+      onChange: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should show nested options when selecting option with nestedOptions', async () => {
+      const user = userEvent.setup();
+      render(<PropertyFilter {...nestedProps} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'Protocol = ');
+      
+      // Wait for ICMP option to appear
+      await waitFor(() => {
+        expect(screen.getByText('ICMP')).toBeInTheDocument();
+      });
+      
+      // Click ICMP (has nested options)
+      await user.click(screen.getByText('ICMP'));
+      
+      // Should show nested options
+      await waitFor(() => {
+        expect(screen.getByText('ICMP Types')).toBeInTheDocument();
+        expect(screen.getByText('Echo')).toBeInTheDocument();
+        expect(screen.getByText('Echo Reply')).toBeInTheDocument();
+      });
+    });
+
+    it('should create two tokens when selecting nested option', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<PropertyFilter {...nestedProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'Protocol = ');
+      
+      // Wait for and click ICMP
+      await waitFor(() => {
+        expect(screen.getByText('ICMP')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('ICMP'));
+      
+      // Wait for and click nested option
+      await waitFor(() => {
+        expect(screen.getByText('Echo')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('Echo'));
+      
+      // Should create two tokens
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [
+            { field: 'protocol', op: 'equals', value: 'icmp' },
+            { field: 'types-and-codes', op: 'equals', value: 'echo' },
+          ],
+          or: [],
+        },
+      });
+    });
+
+    it('should clear pending nested selection when user modifies text', async () => {
+      const user = userEvent.setup();
+      render(<PropertyFilter {...nestedProps} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'Protocol = ');
+      
+      // Click ICMP to trigger nested selection
+      await waitFor(() => {
+        expect(screen.getByText('ICMP')).toBeInTheDocument();
+      });
+      await user.click(screen.getByText('ICMP'));
+      
+      // Verify nested options are shown
+      await waitFor(() => {
+        expect(screen.getByText('Echo')).toBeInTheDocument();
+      });
+      
+      // Clear input and type something else
+      await user.clear(input);
+      await user.type(input, 'Status');
+      
+      // Nested options should no longer be visible
+      await waitFor(() => {
+        expect(screen.queryByText('ICMP Types')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should not show hidden properties in dropdown', async () => {
+      const user = userEvent.setup();
+      render(<PropertyFilter {...nestedProps} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+      
+      // Wait for properties to show
+      await waitFor(() => {
+        expect(screen.getByText('Protocol')).toBeInTheDocument();
+      });
+      
+      // Hidden property should not be visible
+      expect(screen.queryByText('Types & Codes')).not.toBeInTheDocument();
+    });
+
+    it('should display tokens created from nested selection correctly', () => {
+      const query = {
+        filter: {
+          and: [
+            { field: 'protocol', op: 'equals', value: 'icmp' },
+            { field: 'types-and-codes', op: 'equals', value: 'echo' },
+          ],
+          or: [],
+        },
+      };
+      
+      render(<PropertyFilter {...nestedProps} query={query} />);
+      
+      // Both tokens should be displayed
+      expect(screen.getByText('Protocol')).toBeInTheDocument();
+      expect(screen.getByText('icmp')).toBeInTheDocument();
+      expect(screen.getByText('echo')).toBeInTheDocument();
+    });
+  });
+
+  describe('validation', () => {
+    const validationProps = {
+      filteringProperties: [
+        {
+          key: 'ip',
+          propertyLabel: 'IP Address',
+          operators: ['=', '!='],
+          defaultOperator: '=',
+          validationType: 'ip',
+        },
+        {
+          key: 'port',
+          propertyLabel: 'Port',
+          operators: ['=', '!='],
+          defaultOperator: '=',
+          validationType: 'port',
+        },
+      ],
+      filteringOptions: [],
+      query: { filter: { and: [], or: [] } },
+      onChange: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should show validation error for invalid IP address', async () => {
+      const user = userEvent.setup();
+      render(<PropertyFilter {...validationProps} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'IP Address = invalid{Enter}');
+      
+      // Should show validation error
+      await waitFor(() => {
+        expect(screen.getByText(/Invalid IP address/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should normalize IP address with /32 suffix', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<PropertyFilter {...validationProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'IP Address = 192.168.1.1{Enter}');
+      
+      // Should create token with normalized value
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [{ field: 'ip', op: 'equals', value: '192.168.1.1/32' }],
+          or: [],
+        },
+      });
+    });
+
+    it('should accept valid CIDR notation', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<PropertyFilter {...validationProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'IP Address = 10.0.0.0/24{Enter}');
+      
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [{ field: 'ip', op: 'equals', value: '10.0.0.0/24' }],
+          or: [],
+        },
+      });
+    });
+
+    it('should show validation error for invalid port', async () => {
+      const user = userEvent.setup();
+      render(<PropertyFilter {...validationProps} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'Port = 99999{Enter}');
+      
+      // Should show validation error
+      await waitFor(() => {
+        expect(screen.getByText(/Port must be between 1 and 65535/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should accept valid port number', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<PropertyFilter {...validationProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'Port = 443{Enter}');
+      
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [{ field: 'port', op: 'equals', value: '443' }],
+          or: [],
+        },
+      });
+    });
+
+    it('should accept port range', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<PropertyFilter {...validationProps} onChange={onChange} />);
+      
+      const input = screen.getByRole('textbox');
+      await user.type(input, 'Port = 80-443{Enter}');
+      
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [{ field: 'port', op: 'equals', value: '80-443' }],
+          or: [],
+        },
+      });
+    });
+  });
 });

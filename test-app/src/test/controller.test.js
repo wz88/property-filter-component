@@ -237,4 +237,170 @@ describe('controller', () => {
       expect(result.value).toBe('');
     });
   });
+
+  describe('getQueryActions - addTokens', () => {
+    it('should add multiple tokens at once', () => {
+      const onChange = vi.fn();
+      const query = { tokens: [], operation: 'and' };
+      const { addTokens } = getQueryActions({ query, onChange, filteringOptions: [] });
+
+      addTokens([
+        { property: null, propertyKey: 'protocol', operator: '=', value: 'icmp' },
+        { property: null, propertyKey: 'types-and-codes', operator: '=', value: 'echo' },
+      ]);
+
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [
+            { field: 'protocol', op: 'equals', value: 'icmp' },
+            { field: 'types-and-codes', op: 'equals', value: 'echo' },
+          ],
+          or: [],
+        },
+      });
+    });
+
+    it('should append multiple tokens to existing tokens', () => {
+      const onChange = vi.fn();
+      const query = {
+        tokens: [{ property: null, operator: ':', value: 'existing' }],
+        operation: 'and',
+      };
+      const { addTokens } = getQueryActions({ query, onChange, filteringOptions: [] });
+
+      addTokens([
+        { property: null, propertyKey: 'field1', operator: '=', value: 'value1' },
+        { property: null, propertyKey: 'field2', operator: '=', value: 'value2' },
+      ]);
+
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [
+            { field: null, op: 'contains', value: 'existing' },
+            { field: 'field1', op: 'equals', value: 'value1' },
+            { field: 'field2', op: 'equals', value: 'value2' },
+          ],
+          or: [],
+        },
+      });
+    });
+  });
+
+  describe('getQueryActions - updateToken', () => {
+    it('should update a token at specific index', () => {
+      const onChange = vi.fn();
+      const query = {
+        tokens: [
+          { property: null, operator: ':', value: 'first' },
+          { property: null, operator: ':', value: 'second' },
+        ],
+        operation: 'and',
+      };
+      const { updateToken } = getQueryActions({ query, onChange, filteringOptions: [] });
+
+      updateToken(1, { property: null, operator: '=', value: 'updated' });
+
+      expect(onChange).toHaveBeenCalledWith({
+        filter: {
+          and: [
+            { field: null, op: 'contains', value: 'first' },
+            { field: null, op: 'equals', value: 'updated' },
+          ],
+          or: [],
+        },
+      });
+    });
+  });
+
+  describe('getAutosuggestOptions - nested options', () => {
+    const filteringProperties = [
+      {
+        key: 'protocol',
+        propertyLabel: 'Protocol',
+        groupValuesLabel: 'Protocol values',
+        operators: ['=', '!='],
+        defaultOperator: '=',
+      },
+    ];
+
+    const filteringOptions = [
+      { property: filteringProperties[0], propertyKey: 'protocol', value: 'tcp', label: 'TCP' },
+      { property: filteringProperties[0], propertyKey: 'protocol', value: 'udp', label: 'UDP' },
+      {
+        property: filteringProperties[0],
+        propertyKey: 'protocol',
+        value: 'icmp',
+        label: 'ICMP',
+        nestedOptions: {
+          groupLabel: 'ICMP Types',
+          additionalTokenField: 'types-and-codes',
+          options: [
+            { value: 'echo', label: 'Echo' },
+            { value: 'echo-reply', label: 'Echo Reply' },
+          ],
+        },
+      },
+    ];
+
+    it('should preserve nestedOptions in value suggestions', () => {
+      const parsedText = {
+        step: 'property',
+        property: filteringProperties[0],
+        operator: '=',
+        value: '',
+      };
+      const result = getAutosuggestOptions(parsedText, filteringProperties, filteringOptions);
+
+      // Find the ICMP option
+      const icmpOption = result.options[0].options.find(opt => opt.label === 'ICMP');
+      expect(icmpOption).toBeDefined();
+      expect(icmpOption.nestedOptions).toBeDefined();
+      expect(icmpOption.nestedOptions.groupLabel).toBe('ICMP Types');
+      expect(icmpOption.originalOption).toBeDefined();
+      expect(icmpOption.keepOpenOnSelect).toBe(true);
+    });
+
+    it('should not add keepOpenOnSelect for options without nestedOptions', () => {
+      const parsedText = {
+        step: 'property',
+        property: filteringProperties[0],
+        operator: '=',
+        value: '',
+      };
+      const result = getAutosuggestOptions(parsedText, filteringProperties, filteringOptions);
+
+      // Find the TCP option (no nested options)
+      const tcpOption = result.options[0].options.find(opt => opt.label === 'TCP');
+      expect(tcpOption).toBeDefined();
+      expect(tcpOption.nestedOptions).toBeUndefined();
+      expect(tcpOption.keepOpenOnSelect).toBe(false);
+    });
+  });
+
+  describe('getAutosuggestOptions - hidden properties', () => {
+    const filteringProperties = [
+      {
+        key: 'status',
+        propertyLabel: 'Status',
+        operators: ['=', '!='],
+        defaultOperator: '=',
+      },
+      {
+        key: 'types-and-codes',
+        propertyLabel: 'Types & Codes',
+        operators: ['=', '!='],
+        defaultOperator: '=',
+        hidden: true,
+      },
+    ];
+
+    it('should not show hidden properties in suggestions', () => {
+      const parsedText = { step: 'free-text', value: '' };
+      const result = getAutosuggestOptions(parsedText, filteringProperties, []);
+
+      const propertyGroup = result.options.find(g => g.label === 'Properties');
+      expect(propertyGroup.options).toHaveLength(1);
+      expect(propertyGroup.options[0].label).toBe('Status');
+    });
+  });
 });

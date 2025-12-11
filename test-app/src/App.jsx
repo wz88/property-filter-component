@@ -67,6 +67,22 @@ const FILTERING_PROPERTIES = [
     defaultOperator: '=',
     validationType: 'port',
   },
+  {
+    key: 'protocol',
+    propertyLabel: 'Protocol',
+    groupValuesLabel: 'Protocol values',
+    operators: ['=', '!='],
+    defaultOperator: '=',
+  },
+  {
+    key: 'types-and-codes',
+    propertyLabel: 'Types & Codes',
+    groupValuesLabel: 'ICMP Types',
+    operators: ['=', '!='],
+    defaultOperator: '=',
+    // Hidden from property suggestions - only created via nested selection
+    hidden: true,
+  },
 ];
 
 // Define filtering options (suggestions)
@@ -86,6 +102,27 @@ const FILTERING_OPTIONS = [
   { propertyKey: 'department', value: 'Support', label: 'Support' },
   { propertyKey: 'department', value: 'HR', label: 'Human Resources' },
   { propertyKey: 'department', value: 'Finance', label: 'Finance' },
+  // Protocol options - TCP and UDP are simple, ICMP has nested options
+  { propertyKey: 'protocol', value: 'tcp', label: 'TCP' },
+  { propertyKey: 'protocol', value: 'udp', label: 'UDP' },
+  { 
+    propertyKey: 'protocol', 
+    value: 'icmp', 
+    label: 'ICMP',
+    // Nested options - selecting ICMP shows these sub-options
+    // Each creates multiple tokens when selected
+    nestedOptions: {
+      groupLabel: 'ICMP Types',
+      // The additional token to create alongside the parent
+      additionalTokenField: 'types-and-codes',
+      options: [
+        { value: 'echo', label: 'Echo' },
+        { value: 'echo-reply', label: 'Echo Reply' },
+        { value: 'echo-and-echo-reply', label: 'Echo & Echo Reply' },
+        { value: 'all-suite', label: 'All Suite' },
+      ],
+    },
+  },
 ];
 
 // Map API operator names to filter functions
@@ -213,6 +250,7 @@ function App() {
               <li>• Click AND/OR between tokens to change the join logic</li>
               <li>• <strong>IP Address</strong>: Use format x.x.x.x or x.x.x.x/22-32 (CIDR)</li>
               <li>• <strong>Port</strong>: Use 80, 445-500 (range), or 21, 22, 80, 443 (list)</li>
+              <li>• <strong>Protocol</strong>: Select ICMP to see nested options (Echo, Echo Reply, etc.) - creates 2 tokens</li>
             </ul>
           </div>
         </Card>

@@ -150,9 +150,17 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
     if (option.keepOpenOnSelect) {
       // Property/operator selection - update input but keep dropdown open
       e?.preventDefault();
-      onChange?.(option.value);
+      e?.stopPropagation(); // Prevent click from bubbling to document
+      // For nested options, don't call onChange - let onOptionSelect handle the text
+      // This prevents the pending selection from being cleared
+      if (!option.nestedOptions) {
+        onChange?.(option.value);
+      }
       onOptionSelect?.({ ...option, preventDefault: () => {} });
-      setTimeout(focusInput, 10); // Refocus after React updates
+      // Don't refocus for nested options - it can cause issues
+      if (!option.nestedOptions) {
+        setTimeout(focusInput, 10); // Refocus after React updates
+      }
     } else {
       // Value selection - complete the filter
       onOptionSelect?.(option);

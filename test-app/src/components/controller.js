@@ -130,6 +130,30 @@ export function getQueryActions({ query, onChange, filteringOptions }) {
   };
 
   /**
+   * Adds multiple tokens at once.
+   * 
+   * IMPORTANT: This function is required for nested selections (e.g., ICMP protocol)
+   * where selecting a single option creates multiple tokens. Using addToken() twice
+   * in succession doesn't work due to React's state batching - the second call
+   * would use stale state and overwrite the first token.
+   * 
+   * @param {Array} newTokens - Array of tokens to add
+   * 
+   * @example
+   * // When user selects "ICMP > Echo", creates two tokens:
+   * addTokens([
+   *   { propertyKey: 'protocol', operator: '=', value: 'icmp' },
+   *   { propertyKey: 'types-and-codes', operator: '=', value: 'echo' }
+   * ]);
+   */
+  const addTokens = (newTokens) => {
+    setQuery({
+      ...query,
+      tokens: [...query.tokens, ...newTokens],
+    });
+  };
+
+  /**
    * Updates an existing token at a specific index.
    * @param {number} updateIndex - Index of token to update
    * @param {Object} updatedToken - New token data
@@ -167,7 +191,7 @@ export function getQueryActions({ query, onChange, filteringOptions }) {
     setQuery({ ...query, operation });
   };
 
-  return { addToken, updateToken, updateOperation, removeToken, removeAllTokens };
+  return { addToken, addTokens, updateToken, updateOperation, removeToken, removeAllTokens };
 }
 
 // =============================================================================
@@ -328,18 +352,26 @@ export function getAutosuggestOptions(
       const { propertyLabel, groupValuesLabel } = parsedText.property;
       // Filter options to only those belonging to this property
       const options = filteringOptions.filter(o => o.property === parsedText.property);
-
+      
       return {
         filterText: parsedText.value, // Filter by what user typed after operator
         options: [
           {
             label: groupValuesLabel || groupValuesText,
-            options: options.map(({ label, value }) => ({
-              // Full value that will be used to create token
-              value: `${propertyLabel} ${parsedText.operator} ${value}`,
-              label: label || value,
-              // Prefix shown in gray before the value
-              labelPrefix: `${propertyLabel} ${parsedText.operator}`,
+            options: options.map((opt) => ({
+                // Full value that will be used to create token
+                value: `${propertyLabel} ${parsedText.operator} ${opt.value}`,
+                label: opt.label || opt.value,
+                // Prefix shown in gray before the value
+                labelPrefix: `${propertyLabel} ${parsedText.operator}`,
+                // NESTED OPTIONS SUPPORT:
+                // Some options (e.g., ICMP protocol) have sub-options that create multiple tokens.
+                // We preserve the nestedOptions config and original option data so PropertyFilter
+                // can show the nested dropdown and create the appropriate tokens.
+                nestedOptions: opt.nestedOptions,
+                originalOption: opt.nestedOptions ? opt : undefined,
+                // Keep dropdown open for options with nested selections so user can pick sub-option
+                keepOpenOnSelect: !!opt.nestedOptions,
             })),
           },
         ],
@@ -411,12 +443,20 @@ export function getAutosuggestOptions(
  * Each property option has keepOpenOnSelect so the dropdown stays open
  * after selection (user still needs to select operator and value).
  * 
+ * HIDDEN PROPERTIES:
+ * Properties with `hidden: true` are filtered out from suggestions.
+ * This is used for properties that should only be created programmatically
+ * (e.g., 'types-and-codes' which is created via nested ICMP selection).
+ * 
  * @param {Array} filteringProperties - Available properties
  * @param {string} groupLabel - Label for the group header
  * @returns {Array} Array with single group object, or empty array
  */
 function getPropertySuggestions(filteringProperties, groupLabel) {
-  const options = filteringProperties.map(property => ({
+  // Filter out hidden properties (only created via nested selection, not direct user input)
+  const visibleProperties = filteringProperties.filter(p => !p.hidden);
+  
+  const options = visibleProperties.map(property => ({
     value: property.propertyLabel,
     label: property.propertyLabel,
     keepOpenOnSelect: true, // Clicking property updates input but keeps dropdown open

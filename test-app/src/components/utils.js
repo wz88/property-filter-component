@@ -144,13 +144,15 @@ export function matchOperatorPrefix(allowedOperators, filteringText) {
  * // If options include {value: 'active', label: 'Active'}
  * matchTokenValue({value: 'Active'}, options) // Returns {value: 'active'}
  */
-export function matchTokenValue({ property, operator, value }, filteringOptions) {
+export function matchTokenValue({ property, propertyKey, operator, value }, filteringOptions) {
   const propertyOptions = filteringOptions.filter(option => option.property === property);
-  const bestMatch = { propertyKey: property?.key, operator, value };
+  // Use existing propertyKey if provided, otherwise derive from property
+  const resolvedPropertyKey = propertyKey || property?.key;
+  const bestMatch = { propertyKey: resolvedPropertyKey, operator, value };
 
   for (const option of propertyOptions) {
     if ((option.label && option.label === value) || (!option.label && option.value === value)) {
-      return { propertyKey: property?.key, operator, value: option.value };
+      return { propertyKey: resolvedPropertyKey, operator, value: option.value };
     }
 
     if (typeof value === 'string' && value.toLowerCase() === (option.label ?? option.value ?? '').toLowerCase()) {
