@@ -1,23 +1,60 @@
+/**
+ * =============================================================================
+ * FilterAutosuggest.jsx - Input with Dropdown Suggestions
+ * =============================================================================
+ * 
+ * This component provides the main input field for the PropertyFilter with
+ * an autocomplete dropdown. It handles:
+ * 
+ * - Text input with change tracking
+ * - Dropdown display with grouped options
+ * - Keyboard navigation (arrow keys, Enter, Escape)
+ * - Option selection with different behaviors (keepOpenOnSelect)
+ * - Free text entry ("Use: text" option)
+ * - Loading and empty states
+ * 
+ * OPTION TYPES:
+ * -------------
+ * Options can have special behaviors:
+ * - keepOpenOnSelect: true - Clicking updates input but keeps dropdown open
+ *   Used for property/operator selection where user continues typing
+ * - isEnteredText: true - Marks option as free text entry
+ *   Used for the "Use: text" option
+ * 
+ * KEYBOARD NAVIGATION:
+ * --------------------
+ * - ArrowDown/Up: Navigate through options
+ * - Enter: Select highlighted option OR submit free text
+ * - Escape: Close dropdown
+ * - Tab: Close dropdown and move focus
+ * 
+ * TO CUSTOMIZE:
+ * -------------
+ * - Styling: Modify className props on Input, ListItem, etc.
+ * - Behavior: Modify handleKeyDown for different keyboard handling
+ * - Display: Modify the JSX in the render section
+ */
+
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Input, List, ListItem, Typography, Spinner } from '@material-tailwind/react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 /**
- * FilterAutosuggest component - input with dropdown suggestions
- * @param {Object} props - Component props
- * @param {string} props.value - Current input value
- * @param {Function} props.onChange - Value change handler
- * @param {Function} props.onOptionSelect - Option selection handler
- * @param {Array} props.options - Grouped options for suggestions
- * @param {string} props.filterText - Text to filter options
- * @param {string} props.placeholder - Input placeholder
- * @param {string} props.ariaLabel - Aria label for input
- * @param {boolean} props.disabled - Whether input is disabled
- * @param {boolean} props.loading - Whether options are loading
- * @param {string} props.loadingText - Loading state text
- * @param {string} props.emptyText - Empty state text
- * @param {Function} props.onLoadItems - Load more items handler
- * @param {Object} props.i18nStrings - Internationalization strings
+ * FilterAutosuggest - Autocomplete input for property filtering.
+ * 
+ * @param {string} value - Current input value (controlled)
+ * @param {Function} onChange - Called when input value changes
+ * @param {Function} onOptionSelect - Called when user selects an option
+ * @param {Array} options - Grouped options: [{ label: 'Group', options: [...] }]
+ * @param {string} filterText - Text to filter options by (may differ from value)
+ * @param {string} placeholder - Input placeholder text
+ * @param {string} ariaLabel - Accessibility label
+ * @param {boolean} disabled - Disable the input
+ * @param {boolean} loading - Show loading spinner
+ * @param {string} loadingText - Text shown during loading
+ * @param {string} emptyText - Text shown when no options match
+ * @param {Function} onLoadItems - Called to load options (async support)
+ * @param {Object} i18nStrings - Localization strings
  */
 const FilterAutosuggest = forwardRef(function FilterAutosuggest({
   value = '',
@@ -34,19 +71,35 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
   onLoadItems,
   i18nStrings = {},
 }, ref) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const inputRef = useRef(null);
-  const dropdownRef = useRef(null);
+  // ==========================================================================
+  // LOCAL STATE
+  // ==========================================================================
+  
+  const [isOpen, setIsOpen] = useState(false);           // Dropdown visibility
+  const [highlightedIndex, setHighlightedIndex] = useState(-1); // Keyboard nav index
+  const inputRef = useRef(null);   // Reference to input container
+  const dropdownRef = useRef(null); // Reference to dropdown for click-outside
 
-  // Expose focus method to parent
+  /**
+   * Expose focus() method to parent via ref.
+   * Allows PropertyFilter to focus this input programmatically.
+   */
   useImperativeHandle(ref, () => ({
     focus: () => inputRef.current?.focus?.(),
   }), []);
 
+  // Extract i18n string for free text option label
   const { enteredTextLabel = (text) => `Use: "${text}"` } = i18nStrings;
 
-  // Filter options based on filterText
+  // ==========================================================================
+  // COMPUTED VALUES
+  // ==========================================================================
+
+  /**
+   * Filter options based on filterText.
+   * Only shows options whose label or value contains the search text.
+   * Groups with no matching options are removed entirely.
+   */
   const filteredOptions = filterText
     ? options.map(group => ({
         ...group,
@@ -60,38 +113,66 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
       })).filter(group => group.options?.length > 0)
     : options;
 
-  // Handle input change
+  // ==========================================================================
+  // EVENT HANDLERS
+  // ==========================================================================
+
+  /**
+   * Handle input text changes.
+   * Opens dropdown and resets keyboard navigation.
+   */
   const handleInputChange = (e) => {
     const newValue = e.target.value;
     onChange?.(newValue);
     setIsOpen(true);
-    setHighlightedIndex(-1);
+    setHighlightedIndex(-1); // Reset highlight when typing
   };
 
-  // Helper to focus the input element
+  /**
+   * Helper to focus the actual input element.
+   * Material Tailwind wraps inputs, so we may need to find the real input.
+   */
   const focusInput = () => {
-    // Material Tailwind Input wraps the actual input, so we need to find it
     const input = inputRef.current?.querySelector?.('input') || inputRef.current;
     input?.focus?.();
   };
 
-  // Handle option selection
+  /**
+   * Handle option click/selection.
+   * 
+   * BEHAVIOR DEPENDS ON OPTION TYPE:
+   * - keepOpenOnSelect: true - Update input, keep dropdown open
+   *   Used for property/operator selection (user continues typing)
+   * - keepOpenOnSelect: false - Select option, close dropdown
+   *   Used for value selection (filter is complete)
+   */
   const handleOptionClick = (option, e) => {
     if (option.keepOpenOnSelect) {
+      // Property/operator selection - update input but keep dropdown open
       e?.preventDefault();
       onChange?.(option.value);
       onOptionSelect?.({ ...option, preventDefault: () => {} });
-      // Keep dropdown open and refocus input after a short delay
-      setTimeout(focusInput, 10);
+      setTimeout(focusInput, 10); // Refocus after React updates
     } else {
+      // Value selection - complete the filter
       onOptionSelect?.(option);
       setIsOpen(false);
       setTimeout(focusInput, 10);
     }
   };
 
-  // Handle keyboard navigation
+  /**
+   * Handle keyboard navigation.
+   * 
+   * SUPPORTED KEYS:
+   * - ArrowDown: Move highlight down (wraps to top)
+   * - ArrowUp: Move highlight up (wraps to bottom)
+   * - Enter: Select highlighted option OR submit free text
+   * - Escape: Close dropdown
+   * - Tab: Close dropdown (default tab behavior continues)
+   */
   const handleKeyDown = (e) => {
+    // Flatten grouped options for keyboard navigation
     const flatOptions = filteredOptions.reduce((acc, group) => {
       return [...acc, ...(group.options || [])];
     }, []);
@@ -100,6 +181,7 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
       case 'ArrowDown':
         e.preventDefault();
         setIsOpen(true);
+        // Move down, wrap to top if at end
         setHighlightedIndex(prev =>
           prev < flatOptions.length - 1 ? prev + 1 : 0
         );
@@ -107,6 +189,7 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
 
       case 'ArrowUp':
         e.preventDefault();
+        // Move up, wrap to bottom if at start
         setHighlightedIndex(prev =>
           prev > 0 ? prev - 1 : flatOptions.length - 1
         );
@@ -115,19 +198,23 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
       case 'Enter':
         e.preventDefault();
         if (highlightedIndex >= 0 && flatOptions[highlightedIndex]) {
+          // Select highlighted option
           handleOptionClick(flatOptions[highlightedIndex], e);
         } else if (value.trim()) {
+          // No option highlighted - submit as free text
           onOptionSelect?.({ value: value.trim(), isEnteredText: true });
           setIsOpen(false);
         }
         break;
 
       case 'Escape':
+        // Close dropdown without selecting
         setIsOpen(false);
         setHighlightedIndex(-1);
         break;
 
       case 'Tab':
+        // Close dropdown, let default tab behavior continue
         setIsOpen(false);
         break;
 
@@ -136,7 +223,14 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
     }
   };
 
-  // Handle click outside
+  // ==========================================================================
+  // EFFECTS
+  // ==========================================================================
+
+  /**
+   * Close dropdown when clicking outside.
+   * Listens for mousedown events on the document.
+   */
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
@@ -152,23 +246,60 @@ const FilterAutosuggest = forwardRef(function FilterAutosuggest({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Focus handler
+  /**
+   * Handle input focus - open dropdown and trigger load.
+   */
   const handleFocus = () => {
     setIsOpen(true);
+    // Notify parent to load options (for async loading)
     onLoadItems?.({ filteringText: value, firstPage: true, samePage: false });
   };
 
+  // ==========================================================================
+  // DISPLAY HELPERS
+  // ==========================================================================
+
+  // Check if there are any options to display
   const hasOptions = filteredOptions.some(group => group.options?.length > 0);
   
-  // Show "Use: text" option only when typing free text (no keepOpenOnSelect options like properties/operators)
+  /**
+   * Determine whether to show the "Use: text" free text option.
+   * 
+   * Show it when:
+   * - User has typed something (value.trim())
+   * - Input is not disabled
+   * - No keepOpenOnSelect options are showing (those are property/operator selections)
+   * 
+   * This prevents showing "Use: Status" when user is selecting a property.
+   */
   const hasKeepOpenOptions = filteredOptions.some(group => 
     group.options?.some(opt => opt.keepOpenOnSelect)
   );
   const showEnteredTextOption = value.trim() && !disabled && !hasKeepOpenOptions;
 
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+  //
+  // STRUCTURE:
+  // ┌─────────────────────────────────────────┐
+  // │ [🔍] [Input field.....................]  │
+  // └─────────────────────────────────────────┘
+  // ┌─────────────────────────────────────────┐
+  // │ Use: "typed text"                       │  ← Free text option
+  // ├─────────────────────────────────────────┤
+  // │ PROPERTIES                              │  ← Group header
+  // │   Status                                │
+  // │   Name                                  │
+  // ├─────────────────────────────────────────┤
+  // │ VALUES                                  │  ← Group header
+  // │   Status = active                       │
+  // │   Status = inactive                     │
+  // └─────────────────────────────────────────┘
+
   return (
     <div className="relative w-full">
-      {/* Input field */}
+      {/* INPUT FIELD with search icon */}
       <div className="relative" ref={inputRef}>
         <Input
           type="text"

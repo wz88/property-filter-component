@@ -1,12 +1,51 @@
 /**
- * Utility functions for PropertyFilter component
+ * =============================================================================
+ * utils.js - Utility Functions for PropertyFilter
+ * =============================================================================
+ * 
+ * This file contains pure utility functions used throughout the PropertyFilter
+ * component. These functions handle:
+ * 
+ * 1. TEXT PARSING - Matching user input to properties and operators
+ * 2. STRING MANIPULATION - Trimming, removing operators from text
+ * 3. TOKEN HANDLING - Converting between formats, flattening groups
+ * 4. OPERATOR MAPPING - Converting between internal symbols and API names
+ * 5. FORMAT CONVERSION - Converting between internal and API query formats
+ * 6. VALIDATION - IP address, port number, and extensible validation
+ * 
+ * ADDING NEW FUNCTIONALITY:
+ * -------------------------
+ * - New validation type: Add case in validateTokenValue() and create validator
+ * - New operator: Add to operatorToApiMap and apiToOperatorMap
+ * - New string utility: Add function and export it
+ * 
+ * All functions are pure (no side effects) and can be unit tested independently.
  */
 
+// =============================================================================
+// TEXT PARSING FUNCTIONS
+// =============================================================================
+// These functions analyze user input to determine what they're typing
+// (property name, operator, value, or free text)
+
 /**
- * Finds the longest property the filtering text starts from.
- * @param {Array} filteringProperties - Array of filtering properties
- * @param {string} filteringText - Current filter text
- * @returns {Object|null} Matched property or null
+ * Finds the longest property that the filtering text starts with.
+ * 
+ * WHY LONGEST MATCH?
+ * If you have properties "Status" and "Status Code", and user types
+ * "Status Code = 200", we want to match "Status Code", not "Status".
+ * 
+ * CASE SENSITIVITY:
+ * First tries exact case match, then falls back to case-insensitive.
+ * This allows "status" to match "Status" property.
+ * 
+ * @param {Array} filteringProperties - Array of property definitions
+ * @param {string} filteringText - Current text in the filter input
+ * @returns {Object|null} The matched property object, or null if no match
+ * 
+ * @example
+ * // Returns the Status property object
+ * matchFilteringProperty([{propertyLabel: 'Status'}], 'Status = active')
  */
 export function matchFilteringProperty(filteringProperties, filteringText) {
   let maxLength = 0;
@@ -28,10 +67,19 @@ export function matchFilteringProperty(filteringProperties, filteringText) {
 }
 
 /**
- * Finds the longest operator the filtering text starts from.
- * @param {Array} allowedOperators - Array of allowed operators
- * @param {string} filteringText - Current filter text
- * @returns {string|null} Matched operator or null
+ * Finds the longest operator that the filtering text starts with.
+ * 
+ * WHY LONGEST MATCH?
+ * Operators like "!=" should be matched before "!" alone.
+ * ">=" should be matched before ">".
+ * 
+ * @param {Array} allowedOperators - Array of operator strings ['=', '!=', ':', etc.]
+ * @param {string} filteringText - Text to check for operator prefix
+ * @returns {string|null} The matched operator, or null if no match
+ * 
+ * @example
+ * matchOperator(['=', '!=', ':'], '!= active') // Returns '!='
+ * matchOperator(['=', '!=', ':'], 'active')    // Returns null
  */
 export function matchOperator(allowedOperators, filteringText) {
   const text = filteringText.toLowerCase();
@@ -50,10 +98,19 @@ export function matchOperator(allowedOperators, filteringText) {
 }
 
 /**
- * Finds if the filtering text matches any operator prefix.
- * @param {Array} allowedOperators - Array of allowed operators
- * @param {string} filteringText - Current filter text
- * @returns {string|null} Matched prefix or null
+ * Checks if the filtering text could be the START of any operator.
+ * 
+ * Used to detect when user is in the "operator step" - they've typed
+ * a property name and are starting to type an operator.
+ * 
+ * @param {Array} allowedOperators - Array of operator strings
+ * @param {string} filteringText - Text to check
+ * @returns {string|null} The text if it's a valid prefix, '' if empty, null if invalid
+ * 
+ * @example
+ * matchOperatorPrefix(['=', '!=', '>='], '!')  // Returns '!' (could become '!=')
+ * matchOperatorPrefix(['=', '!=', '>='], 'x')  // Returns null (not a valid prefix)
+ * matchOperatorPrefix(['=', '!=', '>='], '')   // Returns '' (empty is valid)
  */
 export function matchOperatorPrefix(allowedOperators, filteringText) {
   if (filteringText.trim().length === 0) {
@@ -68,10 +125,24 @@ export function matchOperatorPrefix(allowedOperators, filteringText) {
 }
 
 /**
- * Match token value against filtering options
+ * Matches a token's value against available filtering options.
+ * 
+ * When user types a value, this tries to find a matching option to get
+ * the canonical value. For example, if user types "Active" but the option
+ * value is "active", this returns "active".
+ * 
+ * MATCHING PRIORITY:
+ * 1. Exact label match (case-sensitive)
+ * 2. Exact value match (case-sensitive)
+ * 3. Case-insensitive label/value match
+ * 
  * @param {Object} token - Token with property, operator, value
- * @param {Array} filteringOptions - Available filtering options
- * @returns {Object} Matched token
+ * @param {Array} filteringOptions - Available options with {property, value, label}
+ * @returns {Object} Token with potentially corrected value
+ * 
+ * @example
+ * // If options include {value: 'active', label: 'Active'}
+ * matchTokenValue({value: 'Active'}, options) // Returns {value: 'active'}
  */
 export function matchTokenValue({ property, operator, value }, filteringOptions) {
   const propertyOptions = filteringOptions.filter(option => option.property === property);
@@ -90,10 +161,16 @@ export function matchTokenValue({ property, operator, value }, filteringOptions)
   return bestMatch;
 }
 
+// =============================================================================
+// STRING MANIPULATION FUNCTIONS
+// =============================================================================
+
 /**
- * Trim leading spaces from a string
- * @param {string} source - Source string
- * @returns {string} Trimmed string
+ * Removes leading spaces from a string.
+ * Similar to String.trimStart() but implemented manually for consistency.
+ * 
+ * @param {string} source - String to trim
+ * @returns {string} String with leading spaces removed
  */
 export function trimStart(source) {
   let spacesLength = 0;
@@ -108,10 +185,19 @@ export function trimStart(source) {
 }
 
 /**
- * Remove operator from source string
- * @param {string} source - Source string
+ * Removes an operator from the beginning of a string.
+ * Also removes a single trailing space after the operator if present.
+ * 
+ * Used when parsing "Status = active" to extract "active" after
+ * finding the "=" operator.
+ * 
+ * @param {string} source - Full string containing operator
  * @param {string} operator - Operator to remove
- * @returns {string} String without operator
+ * @returns {string} Remaining string after operator
+ * 
+ * @example
+ * removeOperator('= active', '=')  // Returns 'active'
+ * removeOperator('=active', '=')   // Returns 'active'
  */
 export function removeOperator(source, operator) {
   const operatorLastIndex = source.indexOf(operator) + operator.length;
@@ -120,19 +206,33 @@ export function removeOperator(source, operator) {
 }
 
 /**
- * Check if source string starts with target
- * @param {string} source - Source string
- * @param {string} target - Target string
- * @returns {boolean} True if starts with target
+ * Checks if source string starts with target string.
+ * Internal helper function (not exported).
+ * 
+ * @param {string} source - String to check
+ * @param {string} target - Prefix to look for
+ * @returns {boolean} True if source starts with target
  */
 function startsWith(source, target) {
   return source.indexOf(target) === 0;
 }
 
+// =============================================================================
+// TOKEN HANDLING FUNCTIONS
+// =============================================================================
+
 /**
- * Transforms query token groups to flat tokens array
+ * Flattens nested token groups into a simple array of tokens.
+ * 
+ * Tokens can be organized in groups for complex queries (e.g., nested AND/OR).
+ * This function extracts all individual tokens regardless of grouping.
+ * 
+ * TOKEN STRUCTURE:
+ * - Simple token: { operator: '=', value: 'x', propertyKey: 'field' }
+ * - Token group: { tokens: [...], operation: 'and' }
+ * 
  * @param {Array} tokenGroups - Array of tokens or token groups
- * @returns {Array} Flat array of tokens
+ * @returns {Array} Flat array of token objects
  */
 export function tokenGroupToTokens(tokenGroups) {
   const tokens = [];
@@ -151,9 +251,20 @@ export function tokenGroupToTokens(tokenGroups) {
 }
 
 /**
- * Get allowed operators for a property
- * @param {Object} property - Filtering property
- * @returns {Array} Array of allowed operators
+ * Gets the list of allowed operators for a property, in display order.
+ * 
+ * Combines the property's configured operators with its default operator,
+ * then returns them in a consistent order for the UI.
+ * 
+ * OPERATOR ORDER: =, !=, :, !:, ^, !^, >=, <=, <, >
+ * This order is used in dropdown menus.
+ * 
+ * @param {Object} property - Property definition with operators array
+ * @returns {Array} Ordered array of operator strings
+ * 
+ * @example
+ * getAllowedOperators({ operators: ['!=', ':'], defaultOperator: '=' })
+ * // Returns ['=', '!=', ':']
  */
 export function getAllowedOperators(property) {
   const { operators = [], defaultOperator = '=' } = property;
@@ -162,24 +273,38 @@ export function getAllowedOperators(property) {
   return operatorOrder.filter(op => operatorSet.has(op));
 }
 
+// =============================================================================
+// OPERATOR MAPPING
+// =============================================================================
+// Internal operators use symbols (=, !=, :) for compact display.
+// API operators use descriptive names (equals, contains) for clarity.
+//
+// TO ADD A NEW OPERATOR:
+// 1. Add to operatorToApiMap (internal → API)
+// 2. Add to apiToOperatorMap (API → internal)
+// 3. Add to operatorOrder in getAllowedOperators() for UI ordering
+// 4. Add description in controller.js operatorDescriptions
+
 /**
- * Map internal operator symbols to API operator names
+ * Maps internal operator symbols to human-readable API names.
+ * Used when converting query to API format for backend/storage.
  */
 const operatorToApiMap = {
-  '=': 'equals',
-  '!=': 'does-not-equal',
-  ':': 'contains',
-  '!:': 'does-not-contain',
-  '^': 'starts-with',
-  '!^': 'does-not-start-with',
-  '>': 'greater-than',
+  '=': 'equals',              // Exact match
+  '!=': 'does-not-equal',     // Not equal
+  ':': 'contains',            // Substring match
+  '!:': 'does-not-contain',   // Does not contain substring
+  '^': 'starts-with',         // Prefix match
+  '!^': 'does-not-start-with', // Does not start with
+  '>': 'greater-than',        // Numeric/date comparison
   '<': 'less-than',
   '>=': 'greater-than-or-equal',
   '<=': 'less-than-or-equal',
 };
 
 /**
- * Map API operator names back to internal operator symbols
+ * Reverse mapping: API names back to internal symbols.
+ * Used when loading query from API/storage.
  */
 const apiToOperatorMap = {
   'equals': '=',
@@ -195,37 +320,71 @@ const apiToOperatorMap = {
 };
 
 /**
- * Convert internal operator to API format
- * @param {string} operator - Internal operator symbol
- * @returns {string} API operator name
+ * Converts internal operator symbol to API name.
+ * @param {string} operator - Internal symbol (e.g., '=')
+ * @returns {string} API name (e.g., 'equals')
  */
 export function operatorToApi(operator) {
   return operatorToApiMap[operator] || operator;
 }
 
 /**
- * Convert API operator to internal format
- * @param {string} apiOp - API operator name
- * @returns {string} Internal operator symbol
+ * Converts API operator name to internal symbol.
+ * @param {string} apiOp - API name (e.g., 'equals')
+ * @returns {string} Internal symbol (e.g., '=')
  */
 export function apiToOperator(apiOp) {
   return apiToOperatorMap[apiOp] || apiOp;
 }
 
+// =============================================================================
+// FORMAT CONVERSION FUNCTIONS
+// =============================================================================
+// The component uses two query formats:
+//
+// INTERNAL FORMAT (used inside component):
+// {
+//   tokens: [{ propertyKey: 'status', operator: '=', value: 'active' }],
+//   operation: 'and'
+// }
+//
+// API FORMAT (used for onChange callback, storage, backend):
+// {
+//   filter: {
+//     and: [{ field: 'status', op: 'equals', value: 'active' }],
+//     or: []
+//   }
+// }
+//
+// WHY TWO FORMATS?
+// - Internal: Optimized for UI manipulation (compact operators, property refs)
+// - API: Optimized for serialization and backend compatibility
+
 /**
- * Convert internal query format to API format
- * @param {Object} query - Internal query {tokens, operation}
- * @returns {Object} API query {filter: {and: [], or: []}}
+ * Converts internal query format to API format.
+ * Called when query changes to pass to onChange callback.
+ * 
+ * @param {Object} query - Internal format { tokens, operation }
+ * @returns {Object} API format { filter: { and: [], or: [] } }
+ * 
+ * @example
+ * queryToApiFormat({
+ *   tokens: [{ propertyKey: 'status', operator: '=', value: 'active' }],
+ *   operation: 'and'
+ * })
+ * // Returns: { filter: { and: [{ field: 'status', op: 'equals', value: 'active' }], or: [] } }
  */
 export function queryToApiFormat(query) {
   const { tokens = [], operation = 'and' } = query;
   
+  // Convert each token to API format
   const filterItems = tokens.map(token => ({
-    field: token.propertyKey || null,
-    op: operatorToApi(token.operator),
+    field: token.propertyKey || null,  // null for free-text filters
+    op: operatorToApi(token.operator), // Convert symbol to name
     value: token.value,
   }));
 
+  // Place items in appropriate array based on operation
   return {
     filter: {
       and: operation === 'and' ? filterItems : [],
@@ -235,32 +394,70 @@ export function queryToApiFormat(query) {
 }
 
 /**
- * Convert API format to internal query format
- * @param {Object} apiQuery - API query {filter: {and: [], or: []}}
- * @returns {Object} Internal query {tokens, operation}
+ * Converts API format to internal query format.
+ * Called when receiving query prop to prepare for internal use.
+ * 
+ * @param {Object} apiQuery - API format { filter: { and: [], or: [] } }
+ * @returns {Object} Internal format { tokens, operation }
+ * 
+ * @example
+ * apiToQueryFormat({
+ *   filter: { and: [{ field: 'status', op: 'equals', value: 'active' }], or: [] }
+ * })
+ * // Returns: { tokens: [{ propertyKey: 'status', operator: '=', value: 'active' }], operation: 'and' }
  */
 export function apiToQueryFormat(apiQuery) {
   const { filter = {} } = apiQuery;
   const { and = [], or = [] } = filter;
 
-  // Determine operation based on which array has items
+  // Determine operation: if OR has items, it's OR; otherwise AND
   const operation = or.length > 0 ? 'or' : 'and';
   const filterItems = operation === 'or' ? or : and;
 
+  // Convert each filter item to internal token format
   const tokens = filterItems.map(item => ({
     propertyKey: item.field,
-    operator: apiToOperator(item.op),
+    operator: apiToOperator(item.op), // Convert name to symbol
     value: item.value,
   }));
 
   return { tokens, operation };
 }
 
+// =============================================================================
+// VALIDATION FUNCTIONS
+// =============================================================================
+// These functions validate token values based on property type.
+// Each validator returns: { valid: boolean, error?: string, normalizedValue?: string }
+//
+// TO ADD A NEW VALIDATION TYPE:
+// 1. Create a new validate function (e.g., validateEmail)
+// 2. Add case in validateTokenValue() switch statement
+// 3. Set validationType on property: { key: 'email', validationType: 'email' }
+//
+// NORMALIZATION:
+// Validators can return normalizedValue to transform the input.
+// Example: IP "1.2.3.4" becomes "1.2.3.4/32" (adds default CIDR)
+
 /**
- * Validate IP address with CIDR notation
- * Format: x.x.x.x/y where x is 0-255 and y is 22-32
- * @param {string} value - IP address string
- * @returns {{ valid: boolean, error?: string, normalizedValue?: string }} Validation result with normalized value
+ * Validates an IP address, optionally with CIDR notation.
+ * 
+ * ACCEPTED FORMATS:
+ * - Plain IP: "192.168.1.1" (normalized to "192.168.1.1/32")
+ * - CIDR notation: "192.168.1.0/24" (kept as-is)
+ * 
+ * VALIDATION RULES:
+ * - Each octet must be 0-255
+ * - CIDR must be 22-32 (configurable range for your use case)
+ * - Plain IPs get /32 appended (single host)
+ * 
+ * @param {string} value - IP address string to validate
+ * @returns {{ valid: boolean, error?: string, normalizedValue?: string }}
+ * 
+ * @example
+ * validateIPAddress('192.168.1.1')     // { valid: true, normalizedValue: '192.168.1.1/32' }
+ * validateIPAddress('192.168.1.0/24')  // { valid: true, normalizedValue: '192.168.1.0/24' }
+ * validateIPAddress('999.1.1.1')       // { valid: false, error: 'Each octet must be...' }
  */
 export function validateIPAddress(value) {
   if (!value || typeof value !== 'string') {
@@ -311,13 +508,25 @@ export function validateIPAddress(value) {
 }
 
 /**
- * Validate port number or port range
- * Formats: 
- *   - Single port: 21, 22, 80, 443
- *   - Range: 445-500 (start must be less than end)
- *   - List: 21, 22, 80, 443
- * @param {string} value - Port value string
- * @returns {{ valid: boolean, error?: string }} Validation result
+ * Validates a port number, range, or comma-separated list.
+ * 
+ * ACCEPTED FORMATS:
+ * - Single port: "80", "443", "8080"
+ * - Port range: "445-500" (start must be less than end)
+ * - Port list: "21, 22, 80, 443" (comma-separated)
+ * 
+ * VALIDATION RULES:
+ * - All ports must be 1-65535
+ * - Ranges must have start < end
+ * 
+ * @param {string} value - Port value string to validate
+ * @returns {{ valid: boolean, error?: string }}
+ * 
+ * @example
+ * validatePortNumber('80')        // { valid: true }
+ * validatePortNumber('445-500')   // { valid: true }
+ * validatePortNumber('21, 22')    // { valid: true }
+ * validatePortNumber('99999')     // { valid: false, error: 'Port must be...' }
  */
 export function validatePortNumber(value) {
   if (!value || typeof value !== 'string') {
@@ -371,16 +580,36 @@ export function validatePortNumber(value) {
 }
 
 /**
- * Validate a token value based on property type
- * @param {string} value - Value to validate
- * @param {Object} property - Property definition with optional validationType
- * @returns {{ valid: boolean, error?: string, normalizedValue?: string }} Validation result with optional normalized value
+ * Main validation dispatcher - validates token value based on property type.
+ * 
+ * This is the entry point for all validation. It checks the property's
+ * validationType and calls the appropriate validator.
+ * 
+ * SUPPORTED VALIDATION TYPES:
+ * - 'ip' or 'ipAddress': IP address with optional CIDR
+ * - 'port' or 'portNumber': Port number, range, or list
+ * - undefined/other: No validation (always valid)
+ * 
+ * TO ADD NEW VALIDATION:
+ * 1. Create validateXxx() function above
+ * 2. Add case here: case 'xxx': return validateXxx(value);
+ * 
+ * @param {string} value - The value to validate
+ * @param {Object} property - Property definition with validationType
+ * @returns {{ valid: boolean, error?: string, normalizedValue?: string }}
+ * 
+ * @example
+ * // Property with IP validation
+ * validateTokenValue('1.2.3.4', { validationType: 'ip' })
+ * // Returns: { valid: true, normalizedValue: '1.2.3.4/32' }
  */
 export function validateTokenValue(value, property) {
+  // No validation if property doesn't specify a type
   if (!property || !property.validationType) {
     return { valid: true };
   }
 
+  // Dispatch to appropriate validator based on type
   switch (property.validationType) {
     case 'ip':
     case 'ipAddress':
@@ -389,6 +618,7 @@ export function validateTokenValue(value, property) {
     case 'portNumber':
       return validatePortNumber(value);
     default:
+      // Unknown validation type - allow value through
       return { valid: true };
   }
 }

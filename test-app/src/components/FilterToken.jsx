@@ -1,19 +1,60 @@
+/**
+ * =============================================================================
+ * FilterToken.jsx - Individual Filter Chip/Tag Component
+ * =============================================================================
+ * 
+ * This component renders a single filter token as a chip/tag. Each token
+ * represents one active filter condition (e.g., "Status = active").
+ * 
+ * VISUAL STRUCTURE:
+ * -----------------
+ * For tokens after the first one:
+ * ┌─────┐ ┌──────────────────────────────┐
+ * │ AND │ │ Status  =  active        [×] │
+ * └─────┘ └──────────────────────────────┘
+ *    ↑           ↑    ↑     ↑          ↑
+ *    │           │    │     │          └─ Remove button
+ *    │           │    │     └─ Value
+ *    │           │    └─ Operator (highlighted)
+ *    │           └─ Property label
+ *    └─ Operation selector (AND/OR dropdown)
+ * 
+ * For free-text tokens (no property):
+ * ┌──────────────────────────────┐
+ * │ : searchterm             [×] │
+ * └──────────────────────────────┘
+ * 
+ * FEATURES:
+ * ---------
+ * - AND/OR operation selector (dropdown or read-only text)
+ * - Property label + operator + value display
+ * - Remove button (X) to delete the token
+ * - Disabled state support
+ * - Customizable via i18nStrings
+ * 
+ * TO CUSTOMIZE STYLING:
+ * ---------------------
+ * - Chip appearance: Modify className on <Chip> component
+ * - Operation button: Modify className on the button element
+ * - Colors: Change text-blue-600, bg-gray-100, etc.
+ */
+
 import React from 'react';
 import { Chip, IconButton, Menu, MenuHandler, MenuList, MenuItem } from '@material-tailwind/react';
 import { XMarkIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 /**
- * FilterToken component - displays a single filter token
- * @param {Object} props - Component props
- * @param {Object} props.token - Token data with propertyLabel, operator, value
- * @param {number} props.index - Token index
- * @param {boolean} props.showOperation - Whether to show AND/OR operation
- * @param {string} props.operation - Current operation ('and' or 'or')
- * @param {Function} props.onRemove - Remove token handler
- * @param {Function} props.onOperationChange - Operation change handler
- * @param {boolean} props.disabled - Whether the token is disabled
- * @param {boolean} props.readOnlyOperations - Whether operations are read-only
- * @param {Object} props.i18nStrings - Internationalization strings
+ * FilterToken - Displays a single filter as a removable chip.
+ * 
+ * @param {Object} token - Token data { propertyLabel, operator, value }
+ * @param {number} index - Token's position in the array (for removal)
+ * @param {boolean} showOperation - Show AND/OR selector (false for first token)
+ * @param {string} operation - Current operation: 'and' or 'or'
+ * @param {Function} onRemove - Called with index when remove button clicked
+ * @param {Function} onOperationChange - Called with new operation when changed
+ * @param {boolean} disabled - Disable interactions
+ * @param {boolean} readOnlyOperations - Show operation as text, not dropdown
+ * @param {Object} i18nStrings - Localization strings
  */
 export default function FilterToken({
   token,
@@ -26,32 +67,54 @@ export default function FilterToken({
   readOnlyOperations = false,
   i18nStrings = {},
 }) {
+  // Extract localized strings with defaults
   const {
     operationAndText = 'and',
     operationOrText = 'or',
     removeTokenAriaLabel = 'Remove filter',
   } = i18nStrings;
 
+  // Destructure token data
   const { propertyLabel, operator, value, formattedText } = token;
 
-  // Determine display text
-  const isAllProperties = !propertyLabel;
+  // ==========================================================================
+  // DISPLAY LOGIC
+  // ==========================================================================
+  
+  /**
+   * Determine how to display the token based on its type:
+   * - Property filter: "Status = active"
+   * - Free text contains: "searchterm" (hide the : operator)
+   * - Free text other: "!: searchterm"
+   */
+  const isAllProperties = !propertyLabel;  // No property = free text search
   const isFreeTextContains = operator === ':' && isAllProperties;
+  
+  // For free text "contains", hide the operator for cleaner display
   const operatorText = isFreeTextContains ? '' : `${operator} `;
   const displayText = isAllProperties
     ? `${operatorText}${value}`
     : `${propertyLabel} ${operator} ${value}`;
 
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
   return (
     <div className="flex items-center gap-1">
-      {/* Operation selector (AND/OR) */}
+      {/* ================================================================
+          OPERATION SELECTOR (AND/OR)
+          Shown between tokens (not on first token)
+          ================================================================ */}
       {showOperation && (
         <div className="mr-1">
           {readOnlyOperations ? (
+            // READ-ONLY: Just display the operation text
             <span className="text-xs font-medium text-gray-500 uppercase px-2">
               {operation === 'and' ? operationAndText : operationOrText}
             </span>
           ) : (
+            // INTERACTIVE: Dropdown to change operation
             <Menu placement="bottom-start">
               <MenuHandler>
                 <button
@@ -82,16 +145,22 @@ export default function FilterToken({
         </div>
       )}
 
-      {/* Token chip */}
+      {/* ================================================================
+          TOKEN CHIP
+          The main filter display with property, operator, value, and remove
+          ================================================================ */}
       <Chip
         value={
           <span className="flex items-center gap-1">
+            {/* Property label (hidden for free text) */}
             {!isAllProperties && (
               <span className="font-medium">{propertyLabel}</span>
             )}
+            {/* Operator (hidden for free text "contains") */}
             {!isFreeTextContains && (
               <span className="text-blue-600 font-semibold">{operator}</span>
             )}
+            {/* Value */}
             <span>{value}</span>
           </span>
         }
@@ -102,13 +171,14 @@ export default function FilterToken({
           onClose: () => !disabled && onRemove?.(index),
         }}
         icon={
+          // REMOVE BUTTON (X icon)
           <IconButton
             variant="text"
             size="sm"
             className="!absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-5 w-5 p-0
                        hover:bg-gray-200 transition-colors"
             onClick={(e) => {
-              e.stopPropagation();
+              e.stopPropagation(); // Prevent chip click
               if (!disabled) onRemove?.(index);
             }}
             disabled={disabled}
